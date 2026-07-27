@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>诺基亚桌面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: "Microsoft YaHei", "SimHei", sans-serif;
+        }
+
+        /* 手机屏幕 */
+        .phone-screen {
+            width: 240px;
+            height: 320px;
+            background: linear-gradient(180deg, #0d1b3e 0%, #1a3a6b 40%, #0d1b3e 100%);
+            position: relative;
+            overflow: hidden;
+            border: 8px solid #2a2a2a;
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* ========== 顶部状态栏 ========== */
+        .status-bar {
+            height: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 4px;
+            position: relative;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        /* 信号天线图标 */
+        .signal-icon {
+            width: 10px;
+            height: 10px;
+            position: relative;
+        }
+        .signal-icon::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 4px;
+            width: 3px;
+            height: 6px;
+            background: #fff;
+            border-radius: 0 0 1px 1px;
+        }
+        .signal-icon::after {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 0;
+            width: 6px;
+            height: 10px;
+            border: 2px solid #fff;
+            border-left: none;
+            border-radius: 0 50% 50% 0;
+        }
+
+        /* 电池图标 */
+        .battery-icon {
+            width: 14px;
+            height: 8px;
+            border: 1px solid #fff;
+            border-radius: 1px;
+            position: relative;
+            background: #4CAF50;
+        }
+        .battery-icon::after {
+            content: '';
+            position: absolute;
+            right: -3px;
+            top: 2px;
+            width: 2px;
+            height: 4px;
+            background: #fff;
+            border-radius: 0 1px 1px 0;
+        }
+
+        .status-time {
+            color: #fff;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        /* SIM卡提示 */
+        .sim-notice {
+            color: #fff;
+            font-size: 10px;
+            padding: 1px 6px;
+            opacity: 0.9;
+        }
+
+        /* ========== 中间快捷方式区域（横向滚动） ========== */
+        .shortcut-bar {
+            display: flex;
+            align-items: center;
+            padding: 8px 4px;
+            margin-top: 2px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            gap: 8px;
+            cursor: grab;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .shortcut-bar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .shortcut-bar:active {
+            cursor: grabbing;
+        }
+
+        .shortcut-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 36px;
+            flex-shrink: 0;
+        }
+
+        .shortcut-icon {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2px;
+        }
+
+        /* 电话图标 */
+        .icon-phone {
+            width: 22px;
+            height: 22px;
+            background: #2196F3;
+            border-radius: 4px 4px 10px 10px;
+            position: relative;
+        }
+        .icon-phone::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 6px;
+            background: #2196F3;
+            border-radius: 2px 2px 0 0;
+        }
+
+        /* 音乐图标 */
+        .icon-music {
+            width: 24px;
+            height: 24px;
+            position: relative;
+        }
+        .icon-music::before {
+            content: '♪';
+            position: absolute;
+            color: #FF9800;
+            font-size: 20px;
+            left: 2px;
+            top: -2px;
+        }
+
+        /* 视频图标 */
+        .icon-video {
+            width: 24px;
+            height: 18px;
+            background: #fff;
+            border-radius: 2px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-video::after {
+            content: '';
+            width: 0;
+            height: 0;
+            border-left: 8px solid #4CAF50;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            margin-left: 2px;
+        }
+
+        /* 日历图标 */
+        .icon-calendar {
+            width: 22px;
+            height: 20px;
+            background: #fff;
+            border-radius: 2px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-calendar::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: 4px;
+            width: 4px;
+            height: 4px;
+            background: #f44336;
+            border-radius: 1px;
+        }
+        .icon-calendar::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            right: 4px;
+            width: 4px;
+            height: 4px;
+            background: #f44336;
+            border-radius: 1px;
+        }
+        .calendar-num {
+            color: #333;
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 2px;
+        }
+
+        /* 文件夹图标 */
+        .icon-folder {
+            width: 24px;
+            height: 18px;
+            background: #2196F3;
+            border-radius: 0 2px 2px 2px;
+            position: relative;
+        }
+        .icon-folder::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: 0;
+            width: 10px;
+            height: 4px;
+            background: #1976D2;
+            border-radius: 2px 2px 0 0;
+        }
+
+        /* ========== 通知列表区域 ========== */
+        .notification-area {
+            padding: 4px 8px;
+            margin-top: 4px;
+        }
+
+        .notify-item {
+            display: flex;
+            align-items: center;
+            padding: 3px 0;
+            color: #fff;
+            font-size: 11px;
+        }
+
+        .notify-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* 红色音符 */
+        .icon-note {
+            color: #f44336;
+            font-size: 14px;
+        }
+
+        /* 收音机图标 */
+        .icon-radio {
+            width: 16px;
+            height: 12px;
+            background: #2196F3;
+            border-radius: 2px;
+            position: relative;
+        }
+        .icon-radio::after {
+            content: '';
+            position: absolute;
+            right: -3px;
+            top: 3px;
+            width: 4px;
+            height: 6px;
+            background: #FF9800;
+            border-radius: 2px;
+        }
+
+        /* 日历小图标 */
+        .icon-cal-small {
+            width: 14px;
+            height: 12px;
+            background: #fff;
+            border-radius: 1px;
+            position: relative;
+        }
+        .icon-cal-small::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 3px;
+            width: 3px;
+            height: 3px;
+            background: #f44336;
+            border-radius: 1px;
+        }
+        .icon-cal-small::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: 3px;
+            width: 3px;
+            height: 3px;
+            background: #f44336;
+            border-radius: 1px;
+        }
+
+        .notify-text {
+            flex: 1;
+        }
+
+        .memo-empty {
+            color: #888;
+            font-size: 10px;
+            padding: 2px 0 2px 22px;
+        }
+
+        /* ========== 壁纸装饰 ========== */
+        .wallpaper-deco {
+            position: absolute;
+            bottom: 40px;
+            right: 10px;
+            width: 80px;
+            height: 80px;
+            opacity: 0.15;
+        }
+        .wallpaper-deco::before {
+            content: '';
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border: 3px solid #4a90d9;
+            border-radius: 50%;
+            top: 10px;
+            left: 10px;
+        }
+        .wallpaper-deco::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 2px solid #4a90d9;
+            border-radius: 50%;
+            top: 20px;
+            left: 20px;
+        }
+
+        /* 钢笔装饰 */
+        .pen-deco {
+            position: absolute;
+            bottom: 35px;
+            right: 15px;
+            width: 50px;
+            height: 8px;
+            background: linear-gradient(90deg, #666, #999);
+            border-radius: 4px;
+            transform: rotate(-30deg);
+            opacity: 0.3;
+        }
+        .pen-deco::before {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: -2px;
+            width: 12px;
+            height: 12px;
+            background: #666;
+            border-radius: 50%;
+        }
+
+        /* ========== 底部软键栏 ========== */
+        .softkey-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 22px;
+            background: linear-gradient(180deg, #1a3a6b 0%, #0d1b3e 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 6px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .softkey-left {
+            color: #64b5f6;
+            font-size: 11px;
+        }
+
+        .softkey-center {
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .softkey-right {
+            color: #64b5f6;
+            font-size: 11px;
+        }
+
+        /* ========== 功能表界面 ========== */
+        .menu-screen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0d1b3e 0%, #1a3a6b 50%, #0d1b3e 100%);
+            position: relative;
+        }
+
+        .menu-header {
+            height: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 4px;
+        }
+
+        .menu-header-left {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .signal-t {
+            color: #fff;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .menu-title {
+            color: #fff;
+            font-size: 12px;
+            margin-left: 4px;
+        }
+
+        .menu-header-right {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .menu-time {
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .menu-page-num {
+            color: #00bcd4;
+            font-size: 11px;
+        }
+
+        /* 胶片装饰 */
+        .film-deco {
+            position: absolute;
+            left: 0;
+            top: 25px;
+            width: 12px;
+            height: 200px;
+            opacity: 0.3;
+        }
+        .film-deco::before {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #000;
+            border-radius: 50%;
+            top: 0;
+            left: 1px;
+            box-shadow: 
+                0 20px 0 #000,
+                0 40px 0 #000,
+                0 60px 0 #000,
+                0 80px 0 #000,
+                0 100px 0 #000,
+                0 120px 0 #000,
+                0 140px 0 #000,
+                0 160px 0 #000,
+                0 180px 0 #000;
+        }
+
+        /* 应用网格 */
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 2px;
+            padding: 8px 16px;
+            height: calc(100% - 40px);
+        }
+
+        .app-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            cursor: pointer;
+        }
+
+        .app-item.selected {
+            background: rgba(33, 150, 243, 0.4);
+            border-radius: 4px;
+        }
+
+        .app-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2px;
+        }
+
+        /* 信息图标 - 信封 */
+        .icon-msg {
+            width: 26px;
+            height: 18px;
+            background: #FFEB3B;
+            border-radius: 2px;
+            position: relative;
+        }
+        .icon-msg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 13px solid transparent;
+            border-right: 13px solid transparent;
+            border-top: 10px solid #FFEB3B;
+        }
+        .icon-msg::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 13px solid transparent;
+            border-right: 13px solid transparent;
+            border-top: 10px solid #FBC02D;
+        }
+
+        /* 联系人图标 */
+        .icon-contact {
+            width: 24px;
+            height: 22px;
+            background: #2196F3;
+            border-radius: 2px;
+            position: relative;
+        }
+        .icon-contact::before {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 8px;
+            background: #fff;
+            border-radius: 50%;
+        }
+        .icon-contact::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 8px;
+            background: #fff;
+            border-radius: 8px 8px 0 0;
+        }
+
+        /* 通话记录图标 */
+        .icon-call-log {
+            width: 24px;
+            height: 20px;
+            position: relative;
+        }
+        .icon-call-log::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 2px;
+            background: #2196F3;
+            top: 4px;
+            left: 2px;
+        }
+        .icon-call-log::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 2px;
+            background: #2196F3;
+            bottom: 4px;
+            left: 2px;
+        }
+        .call-arrow-left {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-right: 6px solid #2196F3;
+        }
+        .call-arrow-right {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 6px solid #2196F3;
+        }
+
+        /* 日历图标 */
+        .icon-cal-app {
+            width: 22px;
+            height: 20px;
+            background: #f44336;
+            border-radius: 2px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-cal-app::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: 4px;
+            width: 4px;
+            height: 4px;
+            background: #fff;
+            border-radius: 1px;
+        }
+        .icon-cal-app::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            right: 4px;
+            width: 4px;
+            height: 4px;
+            background: #fff;
+            border-radius: 1px;
+        }
+        .cal-app-num {
+            color: #fff;
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 2px;
+        }
+
+        /* 相册图标 */
+        .icon-gallery {
+            width: 26px;
+            height: 20px;
+            background: #333;
+            border-radius: 2px;
+            position: relative;
+            overflow: hidden;
+        }
+        .icon-gallery::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 4px;
+            background: repeating-linear-gradient(90deg, #666 0px, #666 4px, #444 4px, #444 8px);
+            top: 4px;
+        }
+        .icon-gallery::after {
+            content: '♪';
+            position: absolute;
+            color: #f44336;
+            font-size: 10px;
+            right: 2px;
+            bottom: 1px;
+        }
+
+        /* 影音天地图标 */
+        .icon-media {
+            width: 24px;
+            height: 20px;
+            background: #333;
+            border-radius: 2px;
+            position: relative;
+        }
+        .icon-media::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 2px;
+            background: #fff;
+        }
+        .icon-media::after {
+            content: '';
+            position: absolute;
+            bottom: 3px;
+            right: 3px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid #FFEB3B;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+        }
+
+        /* 相机图标 */
+        .icon-camera {
+            width: 26px;
+            height: 20px;
+            background: #2196F3;
+            border-radius: 3px;
+            position: relative;
+        }
+        .icon-camera::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 4px;
+            background: #1976D2;
+            border-radius: 2px 2px 0 0;
+        }
+        .icon-camera::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background: #0d1b3e;
+            border-radius: 50%;
+            border: 2px solid #64b5f6;
+        }
+
+        /* 一键通图标 */
+        .icon-ptt {
+            display: flex;
+            gap: 2px;
+            align-items: flex-end;
+        }
+        .ptt-phone {
+            width: 10px;
+            height: 16px;
+            background: #2196F3;
+            border-radius: 2px 2px 6px 6px;
+            position: relative;
+        }
+        .ptt-phone::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 3px;
+            background: #1976D2;
+            border-radius: 1px;
+        }
+
+        /* 百宝箱图标 */
+        .icon-box {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 2px;
+            width: 20px;
+            height: 20px;
+        }
+        .box-cell {
+            background: #2196F3;
+            border-radius: 1px;
+        }
+
+        .app-name {
+            color: #fff;
+            font-size: 9px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        /* ========== 百宝箱界面 ========== */
+        .box-screen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0d1b3e 0%, #1a3a6b 40%, #0a1528 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .box-header {
+            height: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 4px;
+        }
+
+        .box-title {
+            color: #fff;
+            font-size: 12px;
+            margin-top: 2px;
+            padding-left: 4px;
+        }
+
+        /* 星球装饰 */
+        .planet-deco {
+            position: absolute;
+            top: 30px;
+            right: -20px;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(100, 181, 246, 0.3), transparent 70%);
+            opacity: 0.5;
+        }
+
+        /* 空白提示 */
+        .box-empty {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 14px;
+        }
+
+        /* 仪表盘装饰 */
+        .gauge-deco {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 60px;
+            opacity: 0.3;
+        }
+        .gauge-deco::before {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: #555;
+            border-radius: 50%;
+            top: 10px;
+            left: 10px;
+        }
+        .gauge-deco::after {
+            content: '';
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border: 3px solid #64b5f6;
+            border-radius: 50%;
+            border-bottom-color: transparent;
+            border-left-color: transparent;
+            top: 5px;
+            left: 5px;
+            transform: rotate(-45deg);
+        }
+
+        /* 点阵装饰 */
+        .dots-deco {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: radial-gradient(circle, rgba(100, 181, 246, 0.3) 1px, transparent 1px);
+            background-size: 6px 6px;
+            mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, transparent 100%);
+        }
+
+        /* 底部软键通用 */
+        .softkey-bar-box {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 22px;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 6px;
+        }
+
+        /* 导航提示 */
+        .nav-hint {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.5);
+            font-size: 9px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-screen" id="phoneScreen">
+        <!-- 桌面界面 -->
+        <div class="desktop-screen" id="desktopScreen">
+            <!-- 顶部状态栏 -->
+            <div class="status-bar">
+                <div class="status-left">
+                    <div class="signal-icon"></div>
+                    <div class="battery-icon"></div>
+                </div>
+                <div class="status-time" id="clock">09:54</div>
+            </div>
+            <div class="sim-notice">未插入SIM卡</div>
+
+            <!-- 快捷方式栏（横向滚动） -->
+            <div class="shortcut-bar">
+                <div class="shortcut-item">
+                    <div class="shortcut-icon">
+                        <div class="icon-phone"></div>
+                    </div>
+                </div>
+                <div class="shortcut-item">
+                    <div class="shortcut-icon">
+                        <div class="icon-music"></div>
+                    </div>
+                </div>
+                <div class="shortcut-item">
+                    <div class="shortcut-icon">
+                        <div class="icon-video"></div>
+                    </div>
+                </div>
+                <div class="shortcut-item">
+                    <div class="shortcut-icon">
+                        <div class="icon-calendar">
+                            <span class="calendar-num">30</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="shortcut-item">
+                    <div class="shortcut-icon">
+                        <div class="icon-folder"></div>
+                    </div>
+                </div>
+                <!-- 额外图标用于演示滚动效果 -->
+                <div class="shortcut-item">
+                    <div class="shortcut-icon">
+                        <div class="icon-msg" style="transform: scale(0.9);"></div>
+                    </div>
+                </div>
+                <div class="shortcut-item">
+                    <div class="shortcut-icon">
+                        <div class="icon-camera" style="transform: scale(0.85);"></div>
+                    </div>
+                </div>
+                <div class="shortcut-item">
+                    <div class="shortcut-icon">
+                        <div class="icon-cal-app" style="transform: scale(0.9);">
+                            <span class="cal-app-num">15</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 通知区域 -->
+            <div class="notification-area">
+                <div class="notify-item">
+                    <div class="notify-icon">
+                        <span class="icon-note">♪</span>
+                    </div>
+                    <span class="notify-text">音乐播放器</span>
+                </div>
+                <div class="notify-item">
+                    <div class="notify-icon">
+                        <div class="icon-radio"></div>
+                    </div>
+                    <span class="notify-text">收音机</span>
+                </div>
+                <div class="notify-item">
+                    <div class="notify-icon">
+                        <div class="icon-cal-small"></div>
+                    </div>
+                    <span class="notify-text">星期一 2026-07-27</span>
+                </div>
+                <div class="memo-empty">无更多备忘</div>
+            </div>
+
+            <!-- 壁纸装饰 -->
+            <div class="wallpaper-deco"></div>
+            <div class="pen-deco"></div>
+
+            <!-- 底部软键 -->
+            <div class="softkey-bar">
+                <span class="softkey-left">相册</span>
+                <span class="softkey-center" onclick="showMenu()">功能表</span>
+                <span class="softkey-right">联系人</span>
+            </div>
+        </div>
+
+        <!-- 功能表界面 -->
+        <div class="menu-screen" id="menuScreen">
+            <div class="menu-header">
+                <div class="menu-header-left">
+                    <span class="signal-t">T</span>
+                    <div class="battery-icon"></div>
+                    <span class="menu-title">功能表</span>
+                </div>
+                <div class="menu-header-right">
+                    <span class="menu-time" id="menuClock">09:55</span>
+                    <span class="menu-page-num">5</span>
+                </div>
+            </div>
+
+            <div class="film-deco"></div>
+
+            <div class="app-grid">
+                <div class="app-item">
+                    <div class="app-icon">
+                        <div class="icon-msg"></div>
+                    </div>
+                    <span class="app-name">信息</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon">
+                        <div class="icon-contact"></div>
+                    </div>
+                    <span class="app-name">联系人</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon">
+                        <div class="icon-call-log">
+                            <div class="call-arrow-left"></div>
+                            <div class="call-arrow-right"></div>
+                        </div>
+                    </div>
+                    <span class="app-name">通话记录</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon">
+                        <div class="icon-cal-app">
+                            <span class="cal-app-num">30</span>
+                        </div>
+                    </div>
+                    <span class="app-name">日历</span>
+                </div>
+                <div class="app-item selected">
+                    <div class="app-icon">
+                        <div class="icon-gallery"></div>
+                    </div>
+                    <span class="app-name">相册</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon">
+                        <div class="icon-media"></div>
+                    </div>
+                    <span class="app-name">影音天地</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon">
+                        <div class="icon-camera"></div>
+                    </div>
+                    <span class="app-name">相机</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon">
+                        <div class="icon-ptt">
+                            <div class="ptt-phone"></div>
+                            <div class="ptt-phone"></div>
+                        </div>
+                    </div>
+                    <span class="app-name">一键通</span>
+                </div>
+                <div class="app-item" onclick="showBox()">
+                    <div class="app-icon">
+                        <div class="icon-box">
+                            <div class="box-cell"></div>
+                            <div class="box-cell"></div>
+                            <div class="box-cell"></div>
+                            <div class="box-cell"></div>
+                        </div>
+                    </div>
+                    <span class="app-name">百宝箱</span>
+                </div>
+            </div>
+
+            <div class="softkey-bar">
+                <span class="softkey-left">选择</span>
+                <span class="softkey-center"></span>
+                <span class="softkey-right" onclick="showDesktop()">退出</span>
+            </div>
+        </div>
+
+        <!-- 百宝箱界面 -->
+        <div class="box-screen" id="boxScreen">
+            <div class="box-header">
+                <div class="status-left">
+                    <span class="signal-t">T</span>
+                    <div class="battery-icon"></div>
+                </div>
+                <div class="status-time" id="boxClock">09:55</div>
+            </div>
+            <div class="box-title">百宝箱</div>
+
+            <div class="planet-deco"></div>
+            <div class="box-empty">【空白】</div>
+            <div class="gauge-deco"></div>
+            <div class="dots-deco"></div>
+
+            <div class="softkey-bar-box">
+                <span class="softkey-left"></span>
+                <span class="softkey-center"></span>
+                <span class="softkey-right" onclick="showMenu()">退出</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav-hint">
+        点击"功能表"进入菜单 | 点击"百宝箱"进入百宝箱 | 点击"退出"返回
+    </div>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeStr = hours + ':' + minutes;
+            document.getElementById('clock').textContent = timeStr;
+            document.getElementById('menuClock').textContent = timeStr;
+            document.getElementById('boxClock').textContent = timeStr;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function showMenu() {
+            document.getElementById('desktopScreen').style.display = 'none';
+            document.getElementById('boxScreen').style.display = 'none';
+            document.getElementById('menuScreen').style.display = 'block';
+        }
+
+        function showDesktop() {
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('boxScreen').style.display = 'none';
+            document.getElementById('desktopScreen').style.display = 'block';
+        }
+
+        function showBox() {
+            document.getElementById('desktopScreen').style.display = 'none';
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('boxScreen').style.display = 'block';
+        }
+
+        // 桌面快捷栏鼠标拖拽滚动（电脑端支持）
+        (function() {
+            const shortcutBar = document.querySelector('.shortcut-bar');
+            if (!shortcutBar) return;
+
+            let isDown = false;
+            let startX;
+            let scrollLeft;
+
+            shortcutBar.addEventListener('mousedown', (e) => {
+                isDown = true;
+                shortcutBar.style.cursor = 'grabbing';
+                startX = e.pageX - shortcutBar.offsetLeft;
+                scrollLeft = shortcutBar.scrollLeft;
+            });
+
+            shortcutBar.addEventListener('mouseleave', () => {
+                isDown = false;
+                shortcutBar.style.cursor = 'grab';
+            });
+
+            shortcutBar.addEventListener('mouseup', () => {
+                isDown = false;
+                shortcutBar.style.cursor = 'grab';
+            });
+
+            shortcutBar.addEventListener('mousemove', (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - shortcutBar.offsetLeft;
+                const walk = (x - startX) * 1.5;
+                shortcutBar.scrollLeft = scrollLeft - walk;
+            });
+        })();
+    </script>
+</body>
+</html>
