@@ -25,15 +25,22 @@ public class NokiaMenuFragment extends Fragment {
 	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		super.onViewCreated(view, savedInstanceState);
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, false);
+		// 顶对齐，使"功能表"标题紧贴信号栏下方，避免垂直居中产生的多余间距。
+		host.scaleMidContent(view, true);
 
 		View wall = host.findViewById(R.id.wallpaper);
 		if (wall != null) {
 			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
+		// 功能表界面顶部不加标题。
 		TextView title = host.findViewById(R.id.topTitle);
 		if (title != null) {
-			title.setText("功能表");
+			title.setText("");
+		}
+		// 底部中间原是进入功能表的入口，进入后清空，避免重复显示"功能表"。
+		TextView bc = host.findViewById(R.id.bottomCenter);
+		if (bc != null) {
+			bc.setText("");
 		}
 		TextView bl = host.findViewById(R.id.bottomLeft);
 		if (bl != null) {
