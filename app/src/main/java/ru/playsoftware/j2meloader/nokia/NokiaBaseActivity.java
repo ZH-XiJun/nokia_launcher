@@ -44,10 +44,33 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		Configuration config = newBase.getResources().getConfiguration();
 		int dpi = config.densityDpi;
 		int fixed = dpi;
-		boolean standard = dpi == 120 || dpi == 160 || dpi == 213
-				|| dpi == 240 || dpi == 320 || dpi == 480 || dpi == 640;
+		int[] standards = {120, 160, 213, 240, 320, 480, 640};
+		boolean standard = false;
+		for (int s : standards) {
+			if (s == dpi) {
+				standard = true;
+				break;
+			}
+		}
 		if (!standard) {
-			fixed = 160;
+			if (dpi < 160) {
+				// 低分辨率设备（如 136 DPI → density 0.85）向上吸附到 mdpi(160)，
+				// 避免亚像素抗锯齿导致矢量图标发虚。
+				fixed = 160;
+			} else {
+				// 高分辨率但非标准密度（如 420 → 480）：吸附到最近的标准密度，
+				// 保留其高像素密度，否则会被压成 160 使图标在小屏上显得极小。
+				int nearest = standards[0];
+				int minDiff = Math.abs(dpi - nearest);
+				for (int s : standards) {
+					int diff = Math.abs(dpi - s);
+					if (diff < minDiff) {
+						minDiff = diff;
+						nearest = s;
+					}
+				}
+				fixed = nearest;
+			}
 		}
 		if (fixed != dpi) {
 			Configuration newConfig = new Configuration(config);
@@ -126,7 +149,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		// 仅把内层 240dp 内容等比放大，并按比例设置栏高。
 		scalePanelContent(findViewById(R.id.bottomPanel), scale, BOT_H, density, false, true);
 
-		// 顶栏：以"原生分辨率"渲染（不做 setScaleX/Y 缩放），避免矢量图标被栅格化后拉伸发虚；
+		// 顶栏：始终以"原生分辨率"渲染（不做 setScaleX/Y 缩放），保证矢量图标清晰不模糊；
 		// 仅按比例设置栏高，内层宽度铺满屏幕、内容垂直居中。
 		if (topPanel != null) {
 			if (topPanel instanceof ViewGroup && ((ViewGroup) topPanel).getChildCount() > 0) {
