@@ -3,11 +3,15 @@ package ru.playsoftware.j2meloader.nokia;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.database.ContentObserver;
+import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.os.Handler;
 import android.provider.Settings;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
@@ -16,6 +20,7 @@ import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import androidx.annotation.DrawableRes;
 
@@ -36,11 +41,24 @@ public class StatusBarController {
 
 	private final NokiaBaseActivity activity;
 	private ImageView ivSignal1, ivSignal2, ivWifi, ivBluetooth, ivAirplane;
+	private LinearLayout sim1Container, sim2Container;
 	private TelephonyManager telephonyManager;
 	private SubscriptionManager subscriptionManager;
+	private WifiManager wifiManager;
 
 	private final SignalListener listener1 = new SignalListener(0);
 	private final SignalListener listener2 = new SignalListener(1);
+
+	// 飞行模式：部分机型不会派发 ACTION_AIRPLANE_MODE_CHANGED 广播，
+	// 故同时用 ContentObserver 监听 Settings.Global.AIRPLANE_MODE_ON 作为兜底。
+	private final ContentObserver airplaneObserver = new ContentObserver(new Handler()) {
+		@Override
+		public void onChange(boolean selfChange) {
+			updateAirplane();
+			updateWifi();
+			refreshSignals();
+		}
+	};
 
 	private final BroadcastReceiver stateReceiver = new BroadcastReceiver() {
 		@Override
@@ -52,6 +70,10 @@ public class StatusBarController {
 				updateAirplane();
 				updateWifi();
 				refreshSignals();
+			} else if (WifiManager.RSSI_CHANGED_ACTION.equals(action)
+					|| WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(action)
+					|| WifiManager.WIFI_STATE_CHANGED_ACTION.equals(action)) {
+				updateWifi();
 			}
 		}
 	};
@@ -68,9 +90,12 @@ public class StatusBarController {
 		ivWifi = activity.findViewById(R.id.ivWifi);
 		ivBluetooth = activity.findViewById(R.id.ivBluetooth);
 		ivAirplane = activity.findViewById(R.id.ivAirplane);
+		sim1Container = activity.findViewById(R.id.sim1Container);
+		sim2Container = activity.findViewById(R.id.sim2Container);
 
 		telephonyManager = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
 		subscriptionManager = (SubscriptionManager) activity.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
+		wifiManager = (WifiManager) activity.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 
 		// 双卡信号需要 READ_PHONE_STATE，缺失则请求（缺失时退化为单卡监听）。
 		if (Build.VERSION.SDK_INT >= 23
@@ -81,14 +106,22 @@ public class StatusBarController {
 		}
 
 		registerSignalListeners();
+		updateAirplane();
 		updateWifi();
 		updateBluetooth();
-		updateAirplane();
 
 		IntentFilter filter = new IntentFilter();
 		filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
 		filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+		filter.addAction(WifiManager.RSSI_CHANGED_ACTION);
+		filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+		filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
 		activity.registerReceiver(stateReceiver, filter);
+
+		// 兜底：监听飞行模式设置变化。
+		ContentResolver cr = activity.getContentResolver();
+		cr.registerContentObserver(
+				Settings.Global.getUriFor(Settings.Global.AIRPLANE_MODE_ON), false, airplaneObserver);
 	}
 
 	/** 取消监听与广播。需在 Activity 的 onPause 中调用。 */
@@ -98,6 +131,11 @@ public class StatusBarController {
 			activity.unregisterReceiver(stateReceiver);
 		} catch (Exception ignore) {
 			// 未注册或已注销，忽略
+		}
+		try {
+			activity.getContentResolver().unregisterContentObserver(airplaneObserver);
+		} catch (Exception ignore) {
+			// 忽略
 		}
 	}
 
@@ -161,12 +199,34 @@ public class StatusBarController {
 		if (ivWifi == null) {
 			return;
 		}
-		// WiFi 图标在 WiFi 已启用（或当前正通过 WiFi 联网）时显示，与飞行模式解耦：
 		// 飞行模式下用户可手动重新开启 WiFi，此时仍应显示图标。
-		if (isWifiEnabled() || isWifiConnected(activity)) {
-			ivWifi.setVisibility(View.VISIBLE);
-		} else {
+		boolean enabled = isWifiEnabled();
+		boolean connected = isWifiConnected(activity);
+		if (!enabled && !connected) {
 			ivWifi.setVisibility(View.GONE);
+			return;
+		}
+		ivWifi.setVisibility(View.VISIBLE);
+		// 根据真实 RSSI 设置 WiFi 信号等级（0-3），而非始终满格。
+		int level = getWifiLevel();
+		ivWifi.setImageResource(wifiLevelToDrawable(level));
+	}
+
+	private int getWifiLevel() {
+		if (wifiManager == null) {
+			return 3;
+		}
+		try {
+			android.net.wifi.WifiInfo info = wifiManager.getConnectionInfo();
+			if (info == null) {
+				return 0;
+			}
+			int rssi = info.getRssi();
+			// calculateSignalLevel(rssi, 4) 返回 0..3
+			int lvl = WifiManager.calculateSignalLevel(rssi, 4);
+			return Math.max(0, Math.min(3, lvl));
+		} catch (Exception e) {
+			return 3;
 		}
 	}
 
@@ -180,16 +240,24 @@ public class StatusBarController {
 	}
 
 	private void updateAirplane() {
-		if (ivAirplane == null) {
-			return;
+		boolean airplane = isAirplaneModeOn();
+		if (ivAirplane != null) {
+			ivAirplane.setVisibility(airplane ? View.VISIBLE : View.GONE);
 		}
-		ivAirplane.setVisibility(isAirplaneModeOn() ? View.VISIBLE : View.GONE);
+		// 飞行模式下隐藏信号栏（SIM 图标 + 标号）。
+		int sigVis = airplane ? View.GONE : View.VISIBLE;
+		if (sim1Container != null) {
+			sim1Container.setVisibility(sigVis);
+		}
+		if (sim2Container != null) {
+			sim2Container.setVisibility(sigVis);
+		}
 	}
 
 	@SuppressLint("MissingPermission")
 	private boolean isWifiEnabled() {
 		try {
-			android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager)
+			WifiManager wm = (WifiManager)
 					activity.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 			return wm != null && wm.isWifiEnabled();
 		} catch (Exception e) {
@@ -255,6 +323,20 @@ public class StatusBarController {
 				return R.drawable.ic_signal_4;
 			default:
 				return R.drawable.ic_signal_0;
+		}
+	}
+
+	@DrawableRes
+	private static int wifiLevelToDrawable(int level) {
+		switch (level) {
+			case 1:
+				return R.drawable.ic_wifi_1;
+			case 2:
+				return R.drawable.ic_wifi_2;
+			case 3:
+				return R.drawable.ic_wifi_3;
+			default:
+				return R.drawable.ic_wifi_0;
 		}
 	}
 

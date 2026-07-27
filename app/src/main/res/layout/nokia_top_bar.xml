@@ -26,6 +26,7 @@
 
             <!-- SIM1 信号 -->
             <LinearLayout
+                android:id="@+id/sim1Container"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
@@ -49,6 +50,7 @@
 
             <!-- SIM2 信号 -->
             <LinearLayout
+                android:id="@+id/sim2Container"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
