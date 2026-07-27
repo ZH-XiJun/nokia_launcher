@@ -39,3 +39,7 @@ captures/
 .externalNativeBuild
 .cxx
 keystore.properties
+
+# Agent / IDE data folders (do not commit)
+.codebuddy/
+.claude/
