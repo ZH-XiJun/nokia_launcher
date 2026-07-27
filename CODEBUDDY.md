@@ -1,6 +1,44 @@
 # CODEBUDDY.md This file provides guidance to CodeBuddy when working with code in this repository.
 
+
+
+##  目标概述
+
+本应用的目标是成为一个**诺基亚风格的全功能安卓桌面启动器（Launcher）**，在J2ME-Loader的基础上修改而来，并作为系统默认 Home 桌面运行。核心诉求：
+
+1. **外观**：模仿诺基亚 S40/S60 风格——顶部状态栏 + 中间内容区 + 底部软键栏。
+2. **融合 J2ME 与安卓**：将 J2ME-Loader 已安装的 JAR 应用与安卓原生应用**视觉上无缝融合**，但 JAR 只在「百宝箱」中展示，不混入功能表。
+3. **物理按键优先**：方向键导航 + 左右软键 + 确认键，所有可选项都可被方向键选中并高亮，最大程度模拟真机。
+4. **功能对等**：桌面上的联系人、信息、通话记录等入口映射为安卓系统功能。
+5. **真实系统信息**：顶栏显示真实信号（含双卡）、WiFi、电量、运营商、时间。
+6. **通知展示**：读取系统通知并展示在桌面指定区域，支持滚动与清除。
+7. **按键音**：按下物理按键时播放提示音。
+8. **可配置**：提供桌面设置入口 + 复用 J2ME-Loader 自身设置入口；快捷栏可编辑。
+
+
+## J2ME-Loader介绍
+
 J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Java ME games by reimplementing the J2ME APIs on top of the Android runtime and translating MIDlet bytecode to run on Android. This repo is a fork of J2meLoader. It is a standard multi-module Gradle/Android project (Groovy DSL, AGP 8.5.1, Gradle 8.7). A skill documenting the local Gradle network/signing fixes lives at `.claude/skills/android-gradle-build` (read it before changing build config or signing).
+
+
+
+## 调试与安装
+
+使用adb 安装应用，并且以debug模式来安装，这样编译速度快。
+
+调试方面，使用adb截图理解，再使用adb 模拟点击来操作。
+
+
+
+## 分辨率适配
+
+本应用需要适配三种分辨率
+
+- 240 * 320 （重要）
+- 320 * 480 （重要）
+- 现代 16:9 及以上比例的长条形屏幕 （次要）
+
+
 
 ## Common commands
 
@@ -58,8 +96,3 @@ This is not a normal app — it is an emulator, so most of the "application logi
 
 **Release signing.** `signingConfigs.release` reads `keystore.properties` (when not running on the Bitrise CI). Debug builds use the default debug key; release builds need the local `test.jks`.
 
-## Tips for working in this repo
-
-- When fixing game-compatibility bugs, the relevant code is almost always under `javax.microedition.*` (API behavior) or `org.microemu` (runtime/lifecycle), not `ru.playsoftware.j2meloader` (which is just the Android shell).
-- The `midlet` flavor is a porting tool, not the emulator; do not assume it shares the emulator's runtime behavior.
-- `app/build.gradle` and `settings.gradle` are already tuned for the local network/JDK/signing. Before "fixing" dependency resolution or the Gradle distribution, consult the `android-gradle-build` skill to avoid breaking the working mirrors.
