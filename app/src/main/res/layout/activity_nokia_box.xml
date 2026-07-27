@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_nokia_box">
+
+    <RelativeLayout
+        android:id="@+id/design_root"
+        android:layout_width="240dp"
+        android:layout_height="320dp"
+        android:layout_gravity="center">
 
     <!-- 顶部栏 -->
     <LinearLayout
@@ -125,4 +131,5 @@
             android:textColor="#64b5f6"
             android:textSize="11sp" />
     </LinearLayout>
-</RelativeLayout>
+    </RelativeLayout>
+</FrameLayout>

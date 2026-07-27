@@ -2,57 +2,23 @@ package ru.playsoftware.j2meloader.nokia;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.widget.TextView;
-
-import androidx.appcompat.app.AppCompatActivity;
-
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
+import android.view.View;
 
 import ru.playsoftware.j2meloader.R;
 
-public class NokiaMenuActivity extends AppCompatActivity {
-	private TextView tvTime;
-	private final Handler clockHandler = new Handler();
-	private final SimpleDateFormat fmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
-	private final Runnable clockTick = new Runnable() {
-		@Override
-		public void run() {
-			if (tvTime != null) {
-				tvTime.setText(fmt.format(new Date()));
-			}
-			clockHandler.postDelayed(this, 1000);
-		}
-	};
-
+public class NokiaMenuActivity extends NokiaBaseActivity {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		getWindow().setFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
-				android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		setContentView(R.layout.activity_nokia_menu);
-		tvTime = findViewById(R.id.tvTime);
+		setupNokiaUi();
 	}
 
-	public void onOpenBox(android.view.View view) {
+	public void onOpenBox(View view) {
 		startActivity(new Intent(this, NokiaBoxActivity.class));
 	}
 
-	public void onExit(android.view.View view) {
+	public void onExit(View view) {
 		finish();
-	}
-
-	@Override
-	protected void onResume() {
-		super.onResume();
-		clockHandler.post(clockTick);
-	}
-
-	@Override
-	protected void onPause() {
-		super.onPause();
-		clockHandler.removeCallbacks(clockTick);
 	}
 }
