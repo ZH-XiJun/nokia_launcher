@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 共用的诺基亚底部软键栏：三页复用，内层 240dp 内容由基类按比例缩放。
+     左/中/右三个文本由每个页面在运行时设置（文字与点击行为）。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bottomPanel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_nokia_softkey"
+    android:visibility="invisible">
+
+    <LinearLayout
+        android:layout_width="240dp"
+        android:layout_height="22dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
+
+        <TextView
+            android:id="@+id/bottomLeft"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="start"
+            android:textColor="#64b5f6"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/bottomCenter"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bottomRight"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:textColor="#64b5f6"
+            android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>

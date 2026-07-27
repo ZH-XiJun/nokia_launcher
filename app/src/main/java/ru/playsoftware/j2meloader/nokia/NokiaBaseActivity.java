@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.util.DisplayMetrics;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.WindowManager;
 import android.widget.TextView;
 
@@ -87,21 +88,61 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		}
 
 		View topPanel = findViewById(R.id.topPanel);
-		// 把应用顶栏整体下移系统状态栏高度，避免被系统状态栏盖住内容；
-		// 最顶部的壁纸仍然可见，形成沉浸式背景。
+		// 顶栏紧贴屏幕最顶部；FLAG_FULLSCREEN 已隐藏状态栏，不需要再下移。
 		if (topPanel != null) {
 			ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) topPanel.getLayoutParams();
-			lp.topMargin = getStatusBarHeight();
+			lp.topMargin = 0;
 			topPanel.setLayoutParams(lp);
 		}
 
 		// 顶/底栏：match_parent 宽度已保证左右铺满、贴顶贴底；
 		// 仅把内层 240dp 内容等比放大，并按比例设置栏高。
 		scalePanelContent(topPanel, scale, TOP_H, density, false, true);
-		// 中间：match_parent 宽度铺满左右、weight 填充顶底之间；
-		// 内容顶部对齐，所以从左上角等比放大，不额外设置面板高度。
-		scalePanelContent(findViewById(R.id.midPanel), scale, MID_H, density, false, false);
 		scalePanelContent(findViewById(R.id.bottomPanel), scale, BOT_H, density, false, true);
+	}
+
+	/**
+	 * 缩放某个碎片的根视图（240dp × 280dp 的设计内容）并锚定到中间容器。
+	 * 内容统一从左上角等比放大铺满整宽（240dp × scale = 屏幕宽）。
+	 * 垂直位置（顶部对齐 / 居中）必须在布局完成后，用容器真实高度减去缩放后的
+	 * 内容高度来定，否则重力会基于"未缩放的小盒子"居中，导致内容下移、顶部留空、
+	 * 底部被裁切——因为 setScaleX/Y 不改变布局边界，不能依赖 gravity。
+	 *
+	 * @param content  碎片根视图（其父必须是中间容器 midPanel）
+	 * @param topAlign true=贴容器顶部（桌面待机屏）；false=垂直居中（菜单/百宝箱）
+	 */
+	protected void scaleMidContent(View content, boolean topAlign) {
+		DisplayMetrics dm = getResources().getDisplayMetrics();
+		float density = dm.density;
+		float widthDp = dm.widthPixels / density;
+		float heightDp = dm.heightPixels / density;
+		float scale = widthDp / BASE_W;
+		if (BASE_W > 0 && 320f * scale > heightDp) {
+			scale = heightDp / 320f;
+		}
+
+		content.setPivotX(0);
+		content.setPivotY(0);
+		content.setScaleX(scale);
+		content.setScaleY(scale);
+
+		final float fScale = scale;
+		final float fDensity = density;
+		content.post(new Runnable() {
+			@Override
+			public void run() {
+				ViewParent parent = content.getParent();
+				if (!(parent instanceof View)) {
+					return;
+				}
+				View panel = (View) parent;
+				panel.setVisibility(View.VISIBLE);
+				int panelH = panel.getHeight();
+				int visualH = (int) (MID_H * fDensity * fScale);
+				int offset = topAlign ? 0 : Math.max(0, (panelH - visualH) / 2);
+				content.setY(offset);
+			}
+		});
 	}
 
 	/** 获取系统状态栏高度；如无法取得则返回 0。 */

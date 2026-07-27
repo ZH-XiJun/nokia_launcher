@@ -121,14 +121,6 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".nokia.NokiaMenuActivity"
-            android:exported="false"
-            android:theme="@style/AppTheme.NoActionBar" />
-        <activity
-            android:name=".nokia.NokiaBoxActivity"
-            android:exported="false"
-            android:theme="@style/AppTheme.NoActionBar" />
-        <activity
             android:name=".config.ConfigActivity"
             android:exported="true"
             android:windowSoftInputMode="stateHidden" />
