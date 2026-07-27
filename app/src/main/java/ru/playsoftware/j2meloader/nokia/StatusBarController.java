@@ -21,6 +21,7 @@ import android.telephony.TelephonyManager;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
 
@@ -42,6 +43,7 @@ public class StatusBarController {
 	private final NokiaBaseActivity activity;
 	private ImageView ivSignal1, ivSignal2, ivWifi, ivBluetooth, ivAirplane;
 	private LinearLayout sim1Container, sim2Container;
+	private TextView simNotice;
 	private TelephonyManager telephonyManager;
 	private SubscriptionManager subscriptionManager;
 	private WifiManager wifiManager;
@@ -56,6 +58,7 @@ public class StatusBarController {
 		public void onChange(boolean selfChange) {
 			updateAirplane();
 			updateWifi();
+			updateSimNotice();
 			refreshSignals();
 		}
 	};
@@ -69,6 +72,7 @@ public class StatusBarController {
 			} else if (Intent.ACTION_AIRPLANE_MODE_CHANGED.equals(action)) {
 				updateAirplane();
 				updateWifi();
+				updateSimNotice();
 				refreshSignals();
 			} else if (WifiManager.RSSI_CHANGED_ACTION.equals(action)
 					|| WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(action)
@@ -92,6 +96,7 @@ public class StatusBarController {
 		ivAirplane = activity.findViewById(R.id.ivAirplane);
 		sim1Container = activity.findViewById(R.id.sim1Container);
 		sim2Container = activity.findViewById(R.id.sim2Container);
+		simNotice = activity.findViewById(R.id.simNotice);
 
 		telephonyManager = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
 		subscriptionManager = (SubscriptionManager) activity.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
@@ -109,6 +114,7 @@ public class StatusBarController {
 		updateAirplane();
 		updateWifi();
 		updateBluetooth();
+		updateSimNotice();
 
 		IntentFilter filter = new IntentFilter();
 		filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
@@ -144,19 +150,26 @@ public class StatusBarController {
 		if (telephonyManager == null) {
 			return;
 		}
+		boolean usedSubscriptionPath = false;
 		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
 			List<SubscriptionInfo> subs = getActiveSubs();
-			for (int i = 0; i < subs.size() && i < 2; i++) {
-				int subId = subs.get(i).getSubscriptionId();
-				TelephonyManager tm = telephonyManager.createForSubscriptionId(subId);
-				PhoneStateListener l = (i == 0) ? listener1 : listener2;
-				tm.listen(l, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+			if (!subs.isEmpty()) {
+				usedSubscriptionPath = true;
+				for (int i = 0; i < subs.size() && i < 2; i++) {
+					int subId = subs.get(i).getSubscriptionId();
+					TelephonyManager tm = telephonyManager.createForSubscriptionId(subId);
+					PhoneStateListener l = (i == 0) ? listener1 : listener2;
+					tm.listen(l, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+				}
+				// 仅有 1 张卡时，第二张卡图标保持空。
+				if (subs.size() <= 1) {
+					listener2.setLevel(0);
+				}
 			}
-			// 仅有 1 张卡时，第二张卡图标保持空。
-			if (subs.size() <= 1) {
-				listener2.setLevel(0);
-			}
-		} else {
+		}
+		// 关键修复：SubscriptionManager 路径拿不到活动 SIM 时（权限不足 / OEM 差异 /
+		// getActiveSubs() 返回空），退化为默认 TelephonyManager 监听，避免信号永远停在 0。
+		if (!usedSubscriptionPath) {
 			telephonyManager.listen(listener1, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
 		}
 		refreshSignals();
@@ -174,9 +187,9 @@ public class StatusBarController {
 				PhoneStateListener l = (i == 0) ? listener1 : listener2;
 				tm.listen(l, PhoneStateListener.LISTEN_NONE);
 			}
-		} else {
-			telephonyManager.listen(listener1, PhoneStateListener.LISTEN_NONE);
 		}
+		// 始终取消默认监听（以防 fallback 路径注册了它）。
+		telephonyManager.listen(listener1, PhoneStateListener.LISTEN_NONE);
 	}
 
 	@SuppressLint("MissingPermission")
@@ -192,6 +205,28 @@ public class StatusBarController {
 	private void refreshSignals() {
 		listener1.apply();
 		listener2.apply();
+	}
+
+	/**
+	 * 根据实际检测到的 SIM 数量动态更新桌面“未插入SIM卡”提示：
+	 * 有 SIM 时隐藏提示，无 SIM 且非飞行模式时显示。
+	 */
+	private void updateSimNotice() {
+		if (simNotice == null) {
+			return;
+		}
+		if (isAirplaneModeOn()) {
+			simNotice.setVisibility(View.GONE);
+			return;
+		}
+		int simCount = 0;
+		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
+			simCount = getActiveSubs().size();
+		} else {
+			// 无法精确判断，保守假设有 SIM（否则系统不会显示信号）。
+			simCount = 1;
+		}
+		simNotice.setVisibility(simCount > 0 ? View.GONE : View.VISIBLE);
 	}
 
 	@SuppressLint("MissingPermission")
