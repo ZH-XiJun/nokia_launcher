@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 共用的诺基亚顶部状态栏：三页复用，内层 240dp 内容由基类按比例缩放。
-     标题(topTitle)由每个页面在运行时设置，使三页顶部栏表现一致。 -->
+<!-- 共用的诺基亚顶部状态栏：三页复用。
+     注意：顶栏由基类以"原生分辨率"渲染（不做 setScaleX 缩放），以保证矢量图标清晰不模糊；
+     仅高度按设计比例(18dp*scale)放大，由代码设置。内层宽度铺满屏幕。
+     左侧图标簇：SIM1 信号 / SIM2 信号 / 电池 / WiFi / 蓝牙 / 飞行模式（后三项按需显示）。
+     标题(topTitle)由每个页面在运行时设置。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/topPanel"
     android:layout_width="match_parent"
@@ -8,37 +11,104 @@
     android:visibility="invisible">
 
     <LinearLayout
-        android:layout_width="240dp"
-        android:layout_height="18dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:gravity="center_vertical"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp">
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
 
+        <!-- 左侧图标簇：双卡信号 + 电池 + WiFi + 蓝牙 + 飞行模式 -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <ImageView
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:layout_marginEnd="3dp"
-                android:src="@drawable/ic_nokia_signal" />
-
-            <ImageView
-                android:layout_width="14dp"
-                android:layout_height="8dp"
-                android:src="@drawable/ic_nokia_battery" />
-
-            <TextView
+            <!-- SIM1 信号 -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="T"
-                android:textColor="#FFFFFF"
-                android:textSize="10sp"
-                android:textStyle="bold" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp" />
+
+                <ImageView
+                    android:id="@+id/ivSignal1"
+                    android:layout_width="20dp"
+                    android:layout_height="15dp"
+                    android:layout_marginStart="2dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_signal_0" />
+            </LinearLayout>
+
+            <!-- SIM2 信号 -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="2"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp" />
+
+                <ImageView
+                    android:id="@+id/ivSignal2"
+                    android:layout_width="20dp"
+                    android:layout_height="15dp"
+                    android:layout_marginStart="2dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_signal_0" />
+            </LinearLayout>
+
+            <!-- 电池（保持不变） -->
+            <ImageView
+                android:id="@+id/ivBattery"
+                android:layout_width="24dp"
+                android:layout_height="13dp"
+                android:layout_marginStart="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_nokia_battery" />
+
+            <!-- WiFi（开启时显示） -->
+            <ImageView
+                android:id="@+id/ivWifi"
+                android:layout_width="20dp"
+                android:layout_height="15dp"
+                android:layout_marginStart="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_nokia_wifi"
+                android:visibility="gone" />
+
+            <!-- 蓝牙（开启时显示） -->
+            <ImageView
+                android:id="@+id/ivBluetooth"
+                android:layout_width="18dp"
+                android:layout_height="15dp"
+                android:layout_marginStart="6dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_nokia_bluetooth"
+                android:visibility="gone" />
+
+            <!-- 飞行模式（开启时显示） -->
+            <ImageView
+                android:id="@+id/ivAirplane"
+                android:layout_width="20dp"
+                android:layout_height="15dp"
+                android:layout_marginStart="6dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_nokia_airplane"
+                android:visibility="gone" />
         </LinearLayout>
 
         <View
@@ -52,7 +122,7 @@
             android:layout_height="wrap_content"
             android:text=""
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <View
@@ -66,7 +136,7 @@
             android:layout_height="wrap_content"
             android:text="09:55"
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>

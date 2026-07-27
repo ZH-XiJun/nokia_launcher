@@ -23,6 +23,8 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	private static final String ACTION_HOME = Intent.ACTION_MAIN;
 	private static final String CATEGORY_HOME = Intent.CATEGORY_HOME;
 
+	private StatusBarController statusBarController;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -30,8 +32,26 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		setupNokiaUi();
 		findViewById(R.id.midPanel).setVisibility(View.VISIBLE);
 
+		statusBarController = new StatusBarController(this);
+
 		if (getSupportFragmentManager().findFragmentById(R.id.midPanel) == null) {
 			loadDesktopFragment();
+		}
+	}
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+		if (statusBarController != null) {
+			statusBarController.start();
+		}
+	}
+
+	@Override
+	protected void onPause() {
+		super.onPause();
+		if (statusBarController != null) {
+			statusBarController.stop();
 		}
 	}
 

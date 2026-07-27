@@ -1,5 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.DisplayMetrics;
@@ -31,6 +33,31 @@ import ru.playsoftware.j2meloader.R;
  * 呈现怀旧的全屏效果。
  */
 public abstract class NokiaBaseActivity extends AppCompatActivity {
+	/**
+	 * 部分低分辨率设备（如 320x480 且系统 density 非标准，例如 136 DPI → density=0.85）
+	 * 会让所有 dp 尺寸落在亚像素位置，被抗锯齿虚化成灰边，导致图标发虚。
+	 * 这里把 density 吸附到标准的 1.0（mdpi），物理布局完全不变（240dp 设计仍铺满屏幕），
+	 * 但所有尺寸对齐到整数像素，彻底消除亚像素模糊。高 DPI 设备（density 已是整数倍）不受影响。
+	 */
+	@Override
+	protected void attachBaseContext(Context newBase) {
+		Configuration config = newBase.getResources().getConfiguration();
+		int dpi = config.densityDpi;
+		int fixed = dpi;
+		boolean standard = dpi == 120 || dpi == 160 || dpi == 213
+				|| dpi == 240 || dpi == 320 || dpi == 480 || dpi == 640;
+		if (!standard) {
+			fixed = 160;
+		}
+		if (fixed != dpi) {
+			Configuration newConfig = new Configuration(config);
+			newConfig.densityDpi = fixed;
+			super.attachBaseContext(newBase.createConfigurationContext(newConfig));
+		} else {
+			super.attachBaseContext(newBase);
+		}
+	}
+
 	private TextView tvTime;
 	private final Handler clockHandler = new Handler();
 	private final SimpleDateFormat fmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
@@ -46,7 +73,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 
 	/** 设计基准尺寸（单位 dp）。 */
 	private static final float BASE_W = 240f;
-	private static final float TOP_H = 18f;
+	private static final float TOP_H = 22f;
 	private static final float BOT_H = 22f;
 	private static final float MID_H = 280f; // 320 - 18 - 22
 
@@ -95,10 +122,25 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 			topPanel.setLayoutParams(lp);
 		}
 
-		// 顶/底栏：match_parent 宽度已保证左右铺满、贴顶贴底；
+		// 底栏：match_parent 宽度已保证左右铺满、贴顶贴底；
 		// 仅把内层 240dp 内容等比放大，并按比例设置栏高。
-		scalePanelContent(topPanel, scale, TOP_H, density, false, true);
 		scalePanelContent(findViewById(R.id.bottomPanel), scale, BOT_H, density, false, true);
+
+		// 顶栏：以"原生分辨率"渲染（不做 setScaleX/Y 缩放），避免矢量图标被栅格化后拉伸发虚；
+		// 仅按比例设置栏高，内层宽度铺满屏幕、内容垂直居中。
+		if (topPanel != null) {
+			if (topPanel instanceof ViewGroup && ((ViewGroup) topPanel).getChildCount() > 0) {
+				View content = ((ViewGroup) topPanel).getChildAt(0);
+				content.setPivotX(0);
+				content.setPivotY(0);
+				content.setScaleX(1);
+				content.setScaleY(1);
+			}
+			ViewGroup.LayoutParams lp = topPanel.getLayoutParams();
+			lp.height = Math.round(TOP_H * density * scale);
+			topPanel.setLayoutParams(lp);
+			topPanel.setVisibility(View.VISIBLE);
+		}
 	}
 
 	/**
@@ -177,7 +219,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		if (setHeight) {
 			// 顶/底栏高度按 scale 放大，宽度由 match_parent 铺满。
 			ViewGroup.LayoutParams lp = panel.getLayoutParams();
-			lp.height = (int) (baseH * density * scale);
+			lp.height = Math.round(baseH * density * scale);
 			panel.setLayoutParams(lp);
 		}
 		panel.setVisibility(View.VISIBLE);
