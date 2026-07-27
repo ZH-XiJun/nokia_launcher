@@ -6,7 +6,6 @@
 
 [![Platform](https://img.shields.io/badge/platform-Android-3DDC84)](#)
 [![Style](https://img.shields.io/badge/style-Nokia%20S40%2FS60-124191)](#)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](#)
 
 ---
 
@@ -68,27 +67,7 @@
 
 ---
 
-## 设置入口说明
-
-功能表内有两个入口，互不相同：
-
-- **桌面设置**：本应用的设置（按键映射、快捷栏、通知、按键音、以及 J2ME-Loader 自身设置入口）。
-- **设置**：安卓系统原生设置。
-
----
-
-## 设计文档
-
-完整的功能设计与实现路线见 [`docs/诺基亚桌面设计文档.md`](docs/诺基亚桌面设计文档.md)。
-
----
-
 ## 致谢
 
 本项目是 [J2meLoader](https://github.com/NaikSoftware/J2meLoader) 的 fork。
 感谢 [woesss](https://github.com/woesss)（[JL-Mod](https://github.com/woesss/JL-Mod) 作者）提供的开源 Mascot Capsule 实现。
-
-## License
-
-> Copyright 2017-2024 Nikita Shakarun.
-> Licensed under the [Apache License, Version 2.0.](http://www.apache.org/licenses/LICENSE-2.0)
