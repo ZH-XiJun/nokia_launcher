@@ -50,7 +50,8 @@ public class StatusBarController {
 	private final NokiaBaseActivity activity;
 	private ImageView ivSignal1, ivSignal2, ivWifi, ivBluetooth, ivAirplane;
 	private LinearLayout sim1Container, sim2Container;
-	private TextView simNotice;
+	private TextView tvCarrier1, tvCarrier2;
+	private View simCarrierContainer;
 	private TelephonyManager telephonyManager;
 	private SubscriptionManager subscriptionManager;
 	private WifiManager wifiManager;
@@ -75,7 +76,7 @@ public class StatusBarController {
 		public void onChange(boolean selfChange) {
 			updateAirplane();
 			updateWifi();
-			updateSimNotice();
+			updateCarriers();
 			refreshSignals();
 		}
 	};
@@ -89,7 +90,7 @@ public class StatusBarController {
 			} else if (Intent.ACTION_AIRPLANE_MODE_CHANGED.equals(action)) {
 				updateAirplane();
 				updateWifi();
-				updateSimNotice();
+				updateCarriers();
 				refreshSignals();
 			} else if (WifiManager.RSSI_CHANGED_ACTION.equals(action)
 					|| WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(action)
@@ -113,7 +114,9 @@ public class StatusBarController {
 		ivAirplane = activity.findViewById(R.id.ivAirplane);
 		sim1Container = activity.findViewById(R.id.sim1Container);
 		sim2Container = activity.findViewById(R.id.sim2Container);
-		simNotice = activity.findViewById(R.id.simNotice);
+		tvCarrier1 = activity.findViewById(R.id.tvCarrier1);
+		tvCarrier2 = activity.findViewById(R.id.tvCarrier2);
+		simCarrierContainer = activity.findViewById(R.id.simCarrierContainer);
 
 		telephonyManager = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
 		subscriptionManager = (SubscriptionManager) activity.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
@@ -131,7 +134,7 @@ public class StatusBarController {
 		updateAirplane();
 		updateWifi();
 		updateBluetooth();
-		updateSimNotice();
+		updateCarriers();
 
 		IntentFilter filter = new IntentFilter();
 		filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
@@ -153,7 +156,7 @@ public class StatusBarController {
 				public void onSubscriptionsChanged() {
 					Log.d(TAG, "onSubscriptionsChanged -> reregister");
 					registerSignalListeners();
-					updateSimNotice();
+					updateCarriers();
 				}
 			};
 			subscriptionManager.addOnSubscriptionsChangedListener(subListener);
@@ -165,7 +168,7 @@ public class StatusBarController {
 	public void onPermissionGranted() {
 		Log.d(TAG, "onPermissionGranted -> reregister");
 		registerSignalListeners();
-		updateSimNotice();
+		updateCarriers();
 	}
 
 	/** 取消监听与广播。需在 Activity 的 onPause 中调用。 */
@@ -215,6 +218,12 @@ public class StatusBarController {
 					TelephonyManager tm = telephonyManager.createForSubscriptionId(subId);
 					PhoneStateListener l = (i == 0) ? listener1 : listener2;
 					tm.listen(l, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+					// 记录每张卡对应的 TM，供读取运营商名使用。
+					if (i == 0) {
+						probeTm1 = tm;
+					} else {
+						probeTm2 = tm;
+					}
 				}
 				// 仅有 1 张卡时，第二张卡图标保持空。
 				if (subs.size() <= 1) {
@@ -323,6 +332,9 @@ public class StatusBarController {
 		Log.d(TAG, "probeSubIds ready=" + ready.size());
 		if (ready.isEmpty()) {
 			telephonyManager.listen(listener1, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+			// 仍将默认 TM 赋给 probeTm1，使运营商名至少能读到第一张卡。
+			probeTm1 = telephonyManager;
+			pollTmSignal(telephonyManager, listener1);
 			return;
 		}
 		SignalListener[] ls = {listener1, listener2};
@@ -386,29 +398,41 @@ public class StatusBarController {
 	 * 根据是否检测到 SIM 卡动态更新桌面“未插入SIM卡”提示：
 	 * 有 SIM 时隐藏提示，无 SIM 且非飞行模式时显示。
 	 * 即使订阅列表拿不到，只要实际监听到了任一卡的信号（或默认卡 READY），也视为有 SIM。
+	/**
+	 * 在桌面顶部原“未插入SIM卡”提示位置显示两张卡的运营商名（横排）。
+	 * 飞行模式或无卡时隐藏容器；有卡则按每张卡对应的 TelephonyManager 读取运营商名，
+	 * 优先用网络运营商名，回退到 SIM 卡中的 SPN，读不到则留空。
 	 */
-	private void updateSimNotice() {
-		if (simNotice == null) {
+	@SuppressLint("MissingPermission")
+	private void updateCarriers() {
+		if (simCarrierContainer == null) {
 			return;
 		}
-		if (isAirplaneModeOn()) {
-			simNotice.setVisibility(View.GONE);
+		if (isAirplaneModeOn()
+				|| (probeTm1 == null && probeTm2 == null
+				&& (listener1.getLevel() <= 0 && listener2.getLevel() <= 0))) {
+			simCarrierContainer.setVisibility(View.GONE);
 			return;
 		}
-		boolean hasSim = false;
-		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
-			hasSim = !getActiveSubs().isEmpty();
+		simCarrierContainer.setVisibility(View.VISIBLE);
+		setCarrierText(tvCarrier1, probeTm1);
+		setCarrierText(tvCarrier2, probeTm2);
+	}
+
+	@SuppressLint("MissingPermission")
+	private void setCarrierText(TextView tv, TelephonyManager tm) {
+		if (tv == null) {
+			return;
 		}
-		// 订阅列表拿不到时，用实际监听到的信号兜底判断。
-		if (!hasSim && (listener1.getLevel() > 0 || listener2.getLevel() > 0)) {
-			hasSim = true;
+		if (tm == null) {
+			tv.setText("");
+			return;
 		}
-		if (!hasSim && telephonyManager != null
-				&& telephonyManager.getSimState() == TelephonyManager.SIM_STATE_READY) {
-			hasSim = true;
+		String name = tm.getNetworkOperatorName();
+		if (name == null || name.isEmpty()) {
+			name = tm.getSimOperatorName();
 		}
-		Log.d(TAG, "updateSimNotice hasSim=" + hasSim);
-		simNotice.setVisibility(hasSim ? View.GONE : View.VISIBLE);
+		tv.setText(name == null ? "" : name);
 	}
 
 	@SuppressLint("MissingPermission")
