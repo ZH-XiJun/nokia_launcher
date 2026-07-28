@@ -74,7 +74,7 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 		if (title != null) {
 			title.setText("快捷栏设置");
 		}
-		host.setBottomBar("保存", null, "返回");
+		host.setBottomBar(null, null, "返回");
 
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 		appListLayout = view.findViewById(R.id.appListLayout);
@@ -375,6 +375,8 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 			}
 		}
 		updateCountText();
+		// 即时持久化，无需再按保存
+		persistSelection();
 	}
 
 	private void updateCountText() {
@@ -385,7 +387,8 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 
 	// ---- 保存选择 ----
 
-	private void saveSelection() {
+	/** 仅持久化，不退出页面 */
+	private void persistSelection() {
 		List<ShortcutApp> result = new ArrayList<>();
 		for (NokiaAppItem app : allApps) {
 			String key = makeKeyForItem(app);
@@ -394,19 +397,16 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 			if (app.launchIntent != null && app.launchIntent.getComponent() != null) {
 				String cls = app.launchIntent.getComponent().getClassName();
 				if (cls != null && cls.startsWith("j2me:")) {
-					// J2ME 应用格式: j2me:label:pathExt
 					String[] parts = cls.split(":", 3);
 					String j2meLabel = parts.length > 1 ? parts[1] : app.label;
 					String j2mePath = parts.length > 2 ? parts[2] : "";
 					String iconPathStr = null;
-					// 查找图标路径
 					String imgPath = Config.getAppDir() + new File(j2mePath).getName() + "/icon.png";
 					if (new File(imgPath).exists()) {
 						iconPathStr = imgPath;
 					}
 					result.add(new ShortcutApp(ShortcutApp.TYPE_J2ME, j2meLabel, j2mePath, iconPathStr));
 				} else {
-					// 安卓应用
 					Intent launch = new Intent(Intent.ACTION_MAIN);
 					launch.addCategory(Intent.CATEGORY_LAUNCHER);
 					launch.setClassName(
@@ -421,8 +421,12 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 		}
 
 		settingsStorage.setShortcutApps(result);
-		NokiaLog.i("ShortcutSettings", "保存 " + result.size() + " 个快捷栏应用");
-		// 保存后返回上一级
+		NokiaLog.i("ShortcutSettings", "即时保存 " + result.size() + " 个快捷栏应用");
+	}
+
+	/** 保存并返回上一级（左软键行为） */
+	private void saveAndExit() {
+		persistSelection();
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 	}
 
@@ -461,9 +465,7 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 
 	@Override
 	public boolean onSoftLeft() {
-		NokiaLog.i("ShortcutSettings", "左软键：保存并返回");
-		saveSelection();
-		return true;
+		return false;
 	}
 
 	@Override
