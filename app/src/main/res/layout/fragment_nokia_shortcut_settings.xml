@@ -44,6 +44,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingStart="4dp"
-            android:paddingEnd="4dp" />
+            android:paddingEnd="4dp"
+            android:paddingBottom="6dp" />
     </ScrollView>
 </RelativeLayout>

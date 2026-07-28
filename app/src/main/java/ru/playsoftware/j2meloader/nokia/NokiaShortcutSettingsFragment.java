@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -43,6 +44,7 @@ import ru.playsoftware.j2meloader.config.Config;
 public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocusHost {
 
 	private LinearLayout appListLayout;
+	private ScrollView appScroll;
 	private final List<NokiaAppItem> allApps = new ArrayList<>();
 	private final Set<String> selectedKeys = new HashSet<>(); // "type:appKey"
 	private NokiaSettingsStorage settingsStorage;
@@ -76,7 +78,34 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 		appListLayout = view.findViewById(R.id.appListLayout);
+		appScroll = view.findViewById(R.id.appScroll);
 		tvSelectedCount = view.findViewById(R.id.tvSelectedCount);
+
+		// 运行时约束 ScrollView 高度，使列表底部正好落在可视区底边
+		view.post(() -> {
+			if (appScroll == null) return;
+			View parent = (View) view.getParent();
+			if (!(parent instanceof View)) {
+				NokiaLog.w("ShortcutSettings", "parent is not a View, skip height constraint");
+				return;
+			}
+			int panelH = ((View) parent).getHeight();
+			float scale = view.getScaleX();
+			if (scale <= 0) scale = 1;
+			int visibleH = (int) (panelH / scale);
+			int headH = appScroll.getTop();
+			int scrollH = visibleH - headH;
+			if (scrollH > 0) {
+				ViewGroup.LayoutParams lp = appScroll.getLayoutParams();
+				lp.height = scrollH;
+				appScroll.setLayoutParams(lp);
+				NokiaLog.i("ShortcutSettings", "约束ScrollView高度: panelH=" + panelH
+						+ " scale=" + scale + " visibleH=" + visibleH
+						+ " headH=" + headH + " scrollH=" + scrollH);
+			} else {
+				NokiaLog.w("ShortcutSettings", "scrollH <= 0, skip height constraint: scrollH=" + scrollH);
+			}
+		});
 
 		// 加载已选中的应用
 		List<ShortcutApp> current = settingsStorage.getShortcutApps();
@@ -457,6 +486,30 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 		clearFocusBackground();
 		focusIndex = index;
 		applyFocusBackground();
+		scrollToVisible(index);
+	}
+
+	/**
+	 * 确保焦点行在 ScrollView 可见区域内，方向键导航时自动跟随滚动。
+	 */
+	private void scrollToVisible(int index) {
+		if (appScroll == null || itemViews == null || index < 0 || index >= itemViews.length) return;
+		View item = itemViews[index];
+		if (item == null) return;
+		appScroll.post(() -> {
+			int scrollY = appScroll.getScrollY();
+			int itemTop = item.getTop();
+			int itemBottom = item.getBottom();
+			int svHeight = appScroll.getHeight();
+			if (svHeight <= 0) return;
+			if (itemTop < scrollY) {
+				appScroll.smoothScrollTo(0, itemTop);
+				NokiaLog.d("ShortcutSettings", "↑ 滚动至 item " + index + " top=" + itemTop);
+			} else if (itemBottom > scrollY + svHeight) {
+				appScroll.smoothScrollTo(0, itemBottom - svHeight);
+				NokiaLog.d("ShortcutSettings", "↓ 滚动至 item " + index + " bottom=" + itemBottom + " svH=" + svHeight);
+			}
+		});
 	}
 
 	private void clearFocusBackground() {
