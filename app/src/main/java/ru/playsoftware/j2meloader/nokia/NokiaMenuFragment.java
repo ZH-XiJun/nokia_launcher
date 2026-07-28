@@ -131,7 +131,7 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		super.onViewCreated(view, savedInstanceState);
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, false);
+		host.scaleMidContent(view, true);
 
 		View wall = host.findViewById(R.id.wallpaper);
 		if (wall != null) {
@@ -141,19 +141,15 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 		if (title != null) {
 			title.setText("");
 		}
-		TextView bc = host.findViewById(R.id.bottomCenter);
-		if (bc != null) {
-			bc.setText("");
-		}
+		// 功能表页：左"选择"、右"退出"，中间按钮隐藏避免蓝色空块
 		TextView bl = host.findViewById(R.id.bottomLeft);
-		if (bl != null) {
-			bl.setText("选择");
-		}
+		if (bl != null) bl.setText("选择");
 		TextView br = host.findViewById(R.id.bottomRight);
 		if (br != null) {
 			br.setText("退出");
 			br.setOnClickListener(v -> host.exitCurrent());
 		}
+		host.setBottomBar("选择", null, "退出");
 
 		appGrid = view.findViewById(R.id.appGrid);
 		tvPage = view.findViewById(R.id.menuPage);
