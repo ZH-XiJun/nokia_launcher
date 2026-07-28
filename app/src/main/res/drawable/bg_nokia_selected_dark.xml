@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 深色选中态：用于白色/浅色壁纸场景（如功能表白底），使用较深的半透明蓝色以提供足够对比度。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#880055FF" />
+    <corners android:radius="4dp" />
+</shape>

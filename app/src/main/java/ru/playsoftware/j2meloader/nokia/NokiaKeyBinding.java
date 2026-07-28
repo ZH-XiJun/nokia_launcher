@@ -1,0 +1,139 @@
+package ru.playsoftware.j2meloader.nokia;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.view.KeyEvent;
+
+/**
+ * 按键绑定存储类。
+ * 管理 8 个动作到 Android KeyCode 的映射，持久化在 SharedPreferences 中。
+ * 默认值适合大多数安卓设备（方向键、确认键、音量键模拟左右软键）。
+ */
+public class NokiaKeyBinding {
+
+	// ---- 动作常量 ----
+	public static final int ACTION_UP = 0;
+	public static final int ACTION_DOWN = 1;
+	public static final int ACTION_LEFT = 2;
+	public static final int ACTION_RIGHT = 3;
+	public static final int ACTION_SELECT = 4;
+	public static final int ACTION_SOFT_LEFT = 5;
+	public static final int ACTION_SOFT_RIGHT = 6;
+	public static final int ACTION_BACK = 7;
+
+	public static final int ACTION_COUNT = 8;
+
+	private static final String PREFS_NAME = "nokia_key_bindings";
+
+	private static final String[] PREF_KEYS = {
+			"up", "down", "left", "right",
+			"select", "soft_left", "soft_right", "back"
+	};
+
+	// 默认按键码 — 方向键/确认/返回有通用默认值，左右软键默认未绑定（需用户自行绑定）
+	private static final int[] DEFAULT_KEYCODES = {
+			KeyEvent.KEYCODE_DPAD_UP,               // up
+			KeyEvent.KEYCODE_DPAD_DOWN,             // down
+			KeyEvent.KEYCODE_DPAD_LEFT,             // left
+			KeyEvent.KEYCODE_DPAD_RIGHT,            // right
+			KeyEvent.KEYCODE_DPAD_CENTER,           // select
+			KeyEvent.KEYCODE_UNKNOWN,               // soft_left (未绑定)
+			KeyEvent.KEYCODE_UNKNOWN,               // soft_right (未绑定)
+			KeyEvent.KEYCODE_BACK,                  // back
+	};
+
+	public static String getActionName(int action) {
+		switch (action) {
+			case ACTION_UP: return "上";
+			case ACTION_DOWN: return "下";
+			case ACTION_LEFT: return "左";
+			case ACTION_RIGHT: return "右";
+			case ACTION_SELECT: return "确认";
+			case ACTION_SOFT_LEFT: return "左软键";
+			case ACTION_SOFT_RIGHT: return "右软键";
+			case ACTION_BACK: return "返回";
+			default: return "未知";
+		}
+	}
+
+	public static boolean isBound(int keycode) {
+		return keycode != KeyEvent.KEYCODE_UNKNOWN;
+	}
+
+	private final SharedPreferences prefs;
+	private final int[] keycodes = new int[ACTION_COUNT];
+
+	public NokiaKeyBinding(Context context) {
+		prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+		load();
+		NokiaLog.i("KeyBinding", "初始化完成，当前绑定：");
+		dumpBindings();
+	}
+
+	/** 打印当前所有动作→按键的绑定，便于调试。 */
+	private void dumpBindings() {
+		for (int i = 0; i < ACTION_COUNT; i++) {
+			int kc = keycodes[i];
+			String state = NokiaKeyBinding.isBound(kc)
+					? NokiaLog.keyName(kc)
+					: "未绑定";
+			NokiaLog.i("KeyBinding", "  " + getActionName(i) + " -> " + state);
+		}
+	}
+
+	/** 从 SharedPreferences 加载所有绑定，未绑定的使用默认值。 */
+	private void load() {
+		for (int i = 0; i < ACTION_COUNT; i++) {
+			keycodes[i] = prefs.getInt(PREF_KEYS[i], DEFAULT_KEYCODES[i]);
+		}
+	}
+
+	/** 保存指定动作的按键码。 */
+	public void setKeyCode(int action, int keycode) {
+		if (action < 0 || action >= ACTION_COUNT) {
+			NokiaLog.w("KeyBinding", "setKeyCode 忽略非法 action=" + action);
+			return;
+		}
+		int old = keycodes[action];
+		keycodes[action] = keycode;
+		prefs.edit().putInt(PREF_KEYS[action], keycode).apply();
+		NokiaLog.i("KeyBinding",
+				"setKeyCode " + getActionName(action)
+						+ " : " + NokiaLog.keyName(old) + " -> " + NokiaLog.keyName(keycode));
+	}
+
+	/** 获取指定动作的按键码。 */
+	public int getKeyCode(int action) {
+		if (action < 0 || action >= ACTION_COUNT) return KeyEvent.KEYCODE_UNKNOWN;
+		return keycodes[action];
+	}
+
+	/** 根据 KeyCode 反查动作，找不到返回 -1。 */
+	public int getActionForKeyCode(int keycode) {
+		for (int i = 0; i < ACTION_COUNT; i++) {
+			if (keycodes[i] == keycode) return i;
+		}
+		return -1;
+	}
+
+	/**
+	 * 判断一个 KeyEvent 是否被绑定到某个动作并返回该动作。
+	 * 返回 -1 表示该按键未绑定。
+	 */
+	public int resolveAction(KeyEvent event) {
+		if (event.getAction() != KeyEvent.ACTION_DOWN) {
+			NokiaLog.d("KeyBinding", "resolveAction 忽略非按下事件 action="
+					+ event.getAction() + " keyCode=" + NokiaLog.keyName(event.getKeyCode()));
+			return -1;
+		}
+		int action = getActionForKeyCode(event.getKeyCode());
+		if (action < 0) {
+			NokiaLog.d("KeyBinding", "resolveAction " + NokiaLog.keyName(event.getKeyCode())
+					+ " -> 未绑定(-1)");
+		} else {
+			NokiaLog.d("KeyBinding", "resolveAction " + NokiaLog.keyName(event.getKeyCode())
+					+ " -> " + getActionName(action) + "(" + action + ")");
+		}
+		return action;
+	}
+}
