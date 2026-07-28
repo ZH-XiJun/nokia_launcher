@@ -17,8 +17,8 @@ public class NokiaAppItem {
 	public final int type;
 	/** 显示名称 */
 	public final String label;
-	/** 图标 */
-	public final Drawable icon;
+	/** 图标（可后续替换，如换为 S60 风格图标） */
+	public Drawable icon;
 	/** 启动该应用的 Intent（特殊入口为 null） */
 	public final Intent launchIntent;
 

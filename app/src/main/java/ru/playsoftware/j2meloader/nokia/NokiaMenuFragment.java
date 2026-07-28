@@ -36,6 +36,58 @@ import ru.playsoftware.j2meloader.R;
  */
 public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 
+	/**
+	 * 第一页固定槽位（参照诺基亚 S60 功能表布局）。
+	 * 每个槽位是一组候选包名（优先级从高到低），命中第一个即固定到前排；
+	 * 全部候选都不存在则跳过该槽位（不占位，后面应用自动补上）。
+	 * 显示名与图标沿用真实应用，保证可识别。
+	 */
+	private static final String[][] PINNED_SLOTS = {
+			// 1 日历
+			{"com.android.calendar", "com.google.android.calendar", "com.miui.calendar",
+					"com.samsung.android.calendar", "com.huawei.calendar"},
+			// 2 名片夹（联系人）
+			{"com.android.contacts", "com.google.android.contacts",
+					"com.samsung.android.app.contacts"},
+			// 3 通讯记录（拨号/电话）
+			{"com.android.dialer", "com.google.android.dialer", "com.samsung.android.dialer"},
+			// 4 网络（浏览器）
+			{"com.android.browser", "com.android.chrome", "com.mi.globalbrowser",
+					"com.huawei.browser", "com.UCMobile", "com.tencent.mtt"},
+			// 5 信息
+			{"com.android.mms", "com.google.android.apps.messaging", "com.android.messaging",
+					"com.samsung.android.messaging"},
+			// 6 多媒体（图库/相册）
+			{"com.android.gallery3d", "com.miui.gallery", "com.google.android.apps.photos",
+					"com.huawei.photos", "com.samsung.android.gallery"},
+			// 7 文件（参考图"共享"位 → 安卓文件管理器）
+			{"com.android.fileexplorer", "com.mi.android.globalFileexplorer",
+					"com.android.documentsui", "com.google.android.documentsui",
+					"com.huawei.hidisk"},
+			// 8 商店
+			{"com.android.vending", "com.xiaomi.market", "com.huawei.appmarket",
+					"com.heytap.market", "com.oppo.market", "com.bbk.appstore"},
+			// 9 相机
+			{"com.android.camera", "com.android.camera2", "com.google.android.GoogleCamera",
+					"com.huawei.camera", "com.samsung.android.camera"},
+			// 10 设置
+			{"com.android.settings"},
+	};
+
+	/** 与 PINNED_SLOTS 一一对应的 S60 风格图标资源 ID */
+	private static final int[] PINNED_SLOT_ICONS = {
+			R.drawable.s60_calendar,   // 1 日历
+			R.drawable.s60_contacts,   // 2 名片夹
+			R.drawable.s60_call_log,   // 3 通讯记录
+			R.drawable.s60_browser,    // 4 网络
+			R.drawable.s60_mms,        // 5 信息
+			R.drawable.s60_gallery,    // 6 多媒体
+			R.drawable.s60_files,      // 7 文件
+			R.drawable.s60_app,        // 8 商店
+			R.drawable.s60_camera,     // 9 相机
+			R.drawable.s60_settings,   // 10 设置
+	};
+
 	/** 列数固定 3 列（诺基亚经典风格） */
 	private static final int COLS = 3;
 	/** 每格设计高度（dp），图标 36 + 标签 9 + 间距 */
@@ -155,6 +207,8 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
 		NokiaLog.i("Menu", "queryIntentActivities 返回 " + list.size() + " 个可启动应用");
 
+		// 先全部放入临时池 pool，后续再按固定槽位提取
+		List<NokiaAppItem> pool = new ArrayList<>();
 		String selfPkg = host.getPackageName();
 		for (ResolveInfo ri : list) {
 			ActivityInfo ai = ri.activityInfo;
@@ -173,25 +227,76 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 			launch.addCategory(Intent.CATEGORY_LAUNCHER);
 			launch.setClassName(ai.packageName, ai.name);
 			launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-			items.add(new NokiaAppItem(NokiaAppItem.TYPE_APP, label, icon, launch));
+			NokiaAppItem item = new NokiaAppItem(NokiaAppItem.TYPE_APP, label, icon, launch);
+
+			// 尝试替换为 S60 风格图标
+			int s60IconRes = NokiaS60IconMap.getIcon(ai.packageName);
+			if (s60IconRes != 0) {
+				Drawable s60Icon = safeDrawable(host, s60IconRes);
+				if (s60Icon != null) {
+					item.icon = s60Icon;
+				}
+			}
+
+			pool.add(item);
 		}
 
-		// 按名称排序，保证顺序稳定
-		Collections.sort(items, new Comparator<NokiaAppItem>() {
+		// 按名称排序，保证 pool 中的顺序稳定
+		Collections.sort(pool, new Comparator<NokiaAppItem>() {
 			@Override
 			public int compare(NokiaAppItem a, NokiaAppItem b) {
 				return a.label.compareToIgnoreCase(b.label);
 			}
 		});
 
-		// 追加特殊入口：百宝箱、按键绑定
+		// —— 第一页固定槽位：按参考图顺序从应用池点名 ——
+		List<NokiaAppItem> pinned = new ArrayList<>();
+		for (int s = 0; s < PINNED_SLOTS.length; s++) {
+			NokiaAppItem hit = null;
+			for (String pkg : PINNED_SLOTS[s]) {
+				hit = pollByPackage(pool, pkg);
+			if (hit != null) {
+				NokiaLog.d("Menu", "固定槽位 " + (s + 1) + " 命中: " + pkg + " -> " + hit.label);
+				// 替换为 S60 风格图标
+				Drawable s60icon = safeDrawable(host, PINNED_SLOT_ICONS[s]);
+				if (s60icon != null) {
+					hit.icon = s60icon;
+					NokiaLog.d("Menu", "  -> 已替换为 S60 图标");
+				}
+				break;
+			}
+		}
+		if (hit != null) {
+			pinned.add(hit);
+			} else {
+				NokiaLog.d("Menu", "固定槽位 " + (s + 1) + " 未命中，跳过（候选包均不存在）");
+			}
+		}
+
+		// 最终顺序：固定槽位 → 百宝箱 → 按键绑定 → 其他应用（按名称排序）
+		items.addAll(pinned);
 		Drawable boxIcon = safeDrawable(host, R.drawable.ic_nokia_box);
 		Drawable kbIcon = safeDrawable(host, R.drawable.ic_nokia_settings);
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_BOX, "百宝箱", boxIcon, null));
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_KEYBIND, "按键绑定", kbIcon, null));
+		items.addAll(pool);
 
-		NokiaLog.i("Menu", "最终列表（含特殊入口）共 " + items.size() + " 项");
+		NokiaLog.i("Menu", "最终列表（固定槽位 " + pinned.size() + " + 特殊入口 + 其他 " + pool.size() + "）共 " + items.size() + " 项");
 		totalPages = Math.max(1, (int) Math.ceil((double) items.size() / perPage));
+	}
+
+	/** 在应用池中按包名查找第一个命中的项并移除，返回之；未命中返回 null。 */
+	@Nullable
+	private static NokiaAppItem pollByPackage(List<NokiaAppItem> pool, String pkg) {
+		for (int i = 0; i < pool.size(); i++) {
+			NokiaAppItem app = pool.get(i);
+			if (app.launchIntent != null && app.launchIntent.getComponent() != null
+					&& pkg.equals(app.launchIntent.getComponent().getPackageName())) {
+				pool.remove(i);
+				return app;
+			}
+		}
+		return null;
 	}
 
 	private Drawable safeDrawable(NokiaDesktopActivity host, int resId) {
