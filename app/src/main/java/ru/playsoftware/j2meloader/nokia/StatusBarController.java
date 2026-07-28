@@ -474,10 +474,11 @@ public class StatusBarController {
 
 	@SuppressLint("MissingPermission")
 	private static int batteryLevelToDrawable(int pct) {
-		if (pct <= 20)  return R.drawable.ic_battery_0;
-		if (pct <= 40)  return R.drawable.ic_battery_25;
-		if (pct <= 60)  return R.drawable.ic_battery_50;
-		if (pct <= 80)  return R.drawable.ic_battery_75;
+		// 4 格电池：每格约 25%，≤10% 显示 1 红格表示告急
+		if (pct <= 10)  return R.drawable.ic_battery_0;
+		if (pct <= 25)  return R.drawable.ic_battery_25;
+		if (pct <= 50)  return R.drawable.ic_battery_50;
+		if (pct <= 75)  return R.drawable.ic_battery_75;
 		return R.drawable.ic_battery_100;
 	}
 

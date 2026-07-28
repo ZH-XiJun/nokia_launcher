@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 电量 0-20%（低电量 / 红色） -->
+<!-- 电量 0-10%：第 1 格红色 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:width="3dp" android:height="8dp" android:gravity="center_vertical|left">
+    <!-- 电池外框（仅描边，使未填充区域可见） -->
+    <item android:width="15dp" android:height="9dp" android:gravity="center_vertical|left">
         <shape android:shape="rectangle">
-            <solid android:color="#F44336"/>
             <stroke android:width="1dp" android:color="#FFFFFF"/>
             <corners android:radius="1dp"/>
+            <solid android:color="#00000000"/>
         </shape>
     </item>
-    <item android:width="2dp" android:height="4dp" android:gravity="center_vertical|right" android:right="-3dp">
+    <!-- 第 1 格 x=2..4 -->
+    <item android:width="2dp" android:height="5dp" android:gravity="top|left" android:left="2dp" android:top="2dp">
+        <shape android:shape="rectangle"><solid android:color="#F44336"/></shape>
+    </item>
+    <!-- 电池帽：紧贴外框右缘 -->
+    <item android:width="3dp" android:height="5dp" android:gravity="top|left" android:left="15dp" android:top="2dp">
         <shape android:shape="rectangle">
             <solid android:color="#FFFFFF"/>
+            <corners android:radius="1dp"/>
         </shape>
     </item>
 </layer-list>
