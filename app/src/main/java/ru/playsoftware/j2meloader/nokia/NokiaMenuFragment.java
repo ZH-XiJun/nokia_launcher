@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -61,6 +62,12 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 	private NokiaAppItem[] pageItems;
 	private View selectedView = null;
 
+	/** 滑动翻页阈值（px，由 dp 换算）与最小速度（px/ms） */
+	private float swipeThreshold;
+	private float swipeMinVel;
+	/** 复用于根视图与每个 cell 的滑动手势监听 */
+	private View.OnTouchListener swipeTouchListener;
+
 	@Nullable
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -103,6 +110,9 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 		// 按 perPage 分配页内缓存数组
 		cellViews = new View[perPage];
 		pageItems = new NokiaAppItem[perPage];
+
+		// 先初始化滑动监听（在 buildCurrentPage 之前，使每个 cell 都能挂载）
+		initSwipeListener(view);
 
 		loadApps();
 		buildCurrentPage();
@@ -251,6 +261,7 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 						setFocusPos(fpos);
 						onSelect();
 					});
+					cell.setOnTouchListener(swipeTouchListener);
 					cellViews[pos] = cell;
 				}
 				row.addView(cell);
@@ -282,10 +293,8 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 					// 页内上移
 					setFocusPos(pos - COLS);
 				} else if (pageIndex > 0) {
-					// 已到本页顶部 → 翻上一页，保持当前列置于末行，体现"一直往上"
-					pageIndex--;
-					rebuildAndFocusCol(col, (rowsPerPage - 1) * COLS + col);
-					NokiaLog.d("Menu", "翻页(上) -> " + (pageIndex + 1) + "/" + totalPages);
+					// 已到本页顶部 → 翻上一页
+					pagePrev();
 				}
 				return true;
 			case NokiaKeyBinding.ACTION_DOWN:
@@ -293,10 +302,8 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 					// 页内下移
 					setFocusPos(pos + COLS);
 				} else if (pageIndex < totalPages - 1) {
-					// 已到本页底部 → 翻下一页，保持当前列置于首行，体现"一直往下"
-					pageIndex++;
-					rebuildAndFocusCol(col, col);
-					NokiaLog.d("Menu", "翻页(下) -> " + (pageIndex + 1) + "/" + totalPages);
+					// 已到本页底部 → 翻下一页
+					pageNext();
 				}
 				return true;
 			case NokiaKeyBinding.ACTION_LEFT:
@@ -334,6 +341,90 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 		}
 		focusPos = newPos;
 		applyFocusBackground();
+	}
+
+	// ---- 翻页（方向键 / 滑动共用） ----
+
+	/** 翻到下一页，保持当前焦点列置于下一页首行（"一直往下"的延续）。 */
+	private void pageNext() {
+		if (!isAdded() || getView() == null) return;
+		int col = focusPos % COLS;
+		if (pageIndex < totalPages - 1) {
+			pageIndex++;
+			rebuildAndFocusCol(col, col);
+			NokiaLog.d("Menu", "翻页(下/左滑) -> " + (pageIndex + 1) + "/" + totalPages
+					+ " col=" + col);
+		}
+	}
+
+	/** 翻到上一页，保持当前焦点列置于上一页末行（"一直往上"的延续）。 */
+	private void pagePrev() {
+		if (!isAdded() || getView() == null) return;
+		int col = focusPos % COLS;
+		if (pageIndex > 0) {
+			pageIndex--;
+			rebuildAndFocusCol(col, (rowsPerPage - 1) * COLS + col);
+			NokiaLog.d("Menu", "翻页(上/右滑) -> " + (pageIndex + 1) + "/" + totalPages
+					+ " col=" + col);
+		}
+	}
+
+	/**
+	 * 初始化滑动翻页手势监听并挂载到根视图。
+	 * 同一监听实例也会在 buildCurrentPage() 中挂载到每个 cell，
+	 * 因为 cell 是 clickable 的、会消费触摸事件，若不挂载到 cell 则滑过图标时无法翻页。
+	 * 判定规则：上滑/左滑 → 下一页；下滑/右滑 → 上一页。
+	 * 位移或速度任一达到阈值即判定为滑动并消费事件（避免误触 item 点击）；
+	 * 否则不消费，事件继续下发，cell 的 onClick 正常启动应用。
+	 */
+	private void initSwipeListener(View root) {
+		swipeThreshold = dp(24);   // 位移阈值（dp）
+		swipeMinVel = 0.35f;       // 速度阈值（px/ms，快速轻扫也翻页）
+		swipeTouchListener = new View.OnTouchListener() {
+			private float downX, downY;
+			private long downTime;
+
+			@Override
+			public boolean onTouch(View v, MotionEvent event) {
+				switch (event.getAction()) {
+					case MotionEvent.ACTION_DOWN:
+						downX = event.getX();
+						downY = event.getY();
+						downTime = event.getEventTime();
+						// clickable 的 app cell 不消费 down，留给 onClick；
+						// 非 clickable 的视图（根布局/midPanel/空白区）必须消费 down，
+						// 否则系统不再下发后续 MOVE/UP，空白处滑动失效。
+						return !v.isClickable();
+					case MotionEvent.ACTION_UP: {
+						float dx = event.getX() - downX;
+						float dy = event.getY() - downY;
+						long dt = event.getEventTime() - downTime;
+						float dist = Math.max(Math.abs(dx), Math.abs(dy));
+						float vel = dt > 0 ? dist / (float) dt : 0f;
+						if (dist >= swipeThreshold
+								|| (dist >= swipeThreshold * 0.5f && vel >= swipeMinVel)) {
+							if (Math.abs(dx) >= Math.abs(dy)) {
+								if (dx < 0) pageNext(); else pagePrev();
+							} else {
+								if (dy < 0) pageNext(); else pagePrev();
+							}
+							return true; // 消费：阻止本次抬起触发 item 点击
+						}
+						return false; // 非滑动：交给 cell 的 onClick 启动应用
+					}
+					default:
+						return false;
+				}
+			}
+		};
+		root.setOnTouchListener(swipeTouchListener);
+		// 同时挂载到 midPanel，覆盖碎片根视图没铺满的空白壁纸区域
+		View mid = requireActivity().findViewById(R.id.midPanel);
+		if (mid != null) {
+			mid.setOnTouchListener(swipeTouchListener);
+			NokiaLog.d("Menu", "initSwipeListener 已挂载到 midPanel（覆盖空白区）");
+		}
+		NokiaLog.d("Menu", "initSwipeListener 已挂载滑动翻页监听（根视图 + midPanel + 每个 cell 复用）");
 	}
 
 	@Override
