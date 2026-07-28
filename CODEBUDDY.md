@@ -29,6 +29,8 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 调试方面，使用adb截图理解，再使用adb 模拟点击来操作。
 
 
+
+
 ## 重要事项
 
 在应该加日志的地方，都要加上日志输出，尽可能多的加日志。方便排查问题
@@ -42,6 +44,11 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 - 320 * 480 （重要）
 - 现代 16:9 及以上比例的长条形屏幕 （次要）
 
+
+## 设备说明
+通过tcpip链接的设备是 320*480分辨率的，可以直接通过adb安装应用。
+通过usb链接的，adb查看名为jz5dauzlu8euw4e6 的设备，是小米设备，是 现代 16:9 及以上比例的长条形屏幕，不支持直接通过adb安装应用，你推送到 `adb -s jz5dauzlu8euw4e6 push "d:/project/nokia_desktop/app/build/outputs/apk/open/debug/J2ME_Loader-1.8.2-open-debug.apk" /sdcard/Download/J2ME_Loader-open-debug.apk` 设备文件中即可。我会来安装。
+这个设备当然也支持adb 查看日志等操作，只是不支持直接安装。
 
 
 ## Common commands
