@@ -205,7 +205,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	}
 
 	public void openBox() {
-		NokiaLog.i("Desktop", "导航 -> 百宝箱");
+		NokiaLog.i("Desktop", "导航 -> 应用程序");
 		switchFragment(new NokiaBoxFragment());
 	}
 

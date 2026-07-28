@@ -33,7 +33,14 @@ public class SAFFileResultContract extends ActivityResultContract<String, Uri> {
     @Override
     public Intent createIntent(@NonNull Context context, String input) {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        i.setType("*/*") ;
+        // 只显示 .jar / .jad / .kjx 文件（SAF 按 MIME 类型过滤）
+        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
+                "application/java-archive",
+                "application/x-java-archive",
+                "application/jar",
+                "application/octet-stream"
+        });
+        i.setType("*/*");
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         return i;
     }

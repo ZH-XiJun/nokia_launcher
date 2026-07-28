@@ -1,34 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 百宝箱中间内容（碎片）：240dp 宽 × 280dp 高，由基类缩放。
-     标题已移到共用顶部栏，这里不再放标题。 -->
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 应用程序中间内容（碎片）：240dp 宽 × 280dp 高，由基类缩放。
+     ScrollView 内为 LinearLayout 容器，由 Java 代码动态添加网格/次级菜单。 -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/appScroll"
     android:layout_width="240dp"
-    android:layout_height="280dp">
+    android:layout_height="280dp"
+    android:scrollbars="none"
+    android:fadingEdge="none"
+    android:overScrollMode="never">
 
-    <ImageView
-        android:layout_width="100dp"
-        android:layout_height="100dp"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentEnd="true"
-        android:layout_marginTop="30dp"
-        android:layout_marginEnd="-20dp"
-        android:alpha="0.5"
-        android:src="@drawable/deco_planet" />
-
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/appContainer"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:text="【空白】"
-        android:textColor="#FFFFFF"
-        android:textSize="14sp" />
+        android:orientation="vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="6dp" />
 
-    <ImageView
-        android:layout_width="60dp"
-        android:layout_height="60dp"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="10dp"
-        android:alpha="0.3"
-        android:src="@drawable/deco_gauge" />
-</RelativeLayout>
+</ScrollView>

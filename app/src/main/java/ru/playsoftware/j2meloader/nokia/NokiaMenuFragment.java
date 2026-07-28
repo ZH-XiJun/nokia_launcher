@@ -273,16 +273,16 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 			}
 		}
 
-		// 最终顺序：固定槽位 → 百宝箱 → 按键绑定 → 桌面设置 → S60匹配应用（按名） → 未匹配应用（按名）
+		// 最终顺序：固定槽位 → 应用程序 → 按键绑定 → 桌面设置 → S60匹配应用（按名） → 未匹配应用（按名）
 		items.addAll(pinned);
 
-		// 百宝箱图标：优先用 S60 应用程序图标
+		// 应用程序图标：优先用 S60 应用程序图标
 		Drawable boxIcon = safeDrawable(host, R.drawable.s60_app);
 		if (boxIcon == null) boxIcon = safeDrawable(host, R.drawable.ic_nokia_box);
 		Drawable kbIcon = safeDrawable(host, R.drawable.ic_nokia_settings);
 		Drawable settingsIcon = safeDrawable(host, R.drawable.s60_settings);
 		if (settingsIcon == null) settingsIcon = safeDrawable(host, R.drawable.ic_nokia_settings);
-		items.add(new NokiaAppItem(NokiaAppItem.TYPE_BOX, "百宝箱", boxIcon, null));
+		items.add(new NokiaAppItem(NokiaAppItem.TYPE_BOX, "应用程序", boxIcon, null));
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_KEYBIND, "按键绑定", kbIcon, null));
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_SETTINGS, "桌面设置", settingsIcon, null));
 
