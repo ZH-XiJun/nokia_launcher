@@ -202,6 +202,10 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 		items.clear();
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		PackageManager pm = host.getPackageManager();
+
+		// 初始化 S60 图标缓存（仅在应用变化时重新扫描意图）
+		NokiaS60IconMap.init(pm);
+
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
 		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
