@@ -26,6 +26,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
+import ru.playsoftware.j2meloader.R;
 
 import java.util.List;
 
@@ -48,7 +49,7 @@ public class StatusBarController {
 	private static final int REQ_PHONE_STATE = 1001;
 
 	private final NokiaBaseActivity activity;
-	private ImageView ivSignal1, ivSignal2, ivWifi, ivBluetooth, ivAirplane;
+	private ImageView ivSignal1, ivSignal2, ivWifi, ivBluetooth, ivAirplane, ivBattery;
 	private LinearLayout sim1Container, sim2Container;
 	private TextView tvCarrier1, tvCarrier2;
 	private View simCarrierContainer;
@@ -96,6 +97,8 @@ public class StatusBarController {
 					|| WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(action)
 					|| WifiManager.WIFI_STATE_CHANGED_ACTION.equals(action)) {
 				updateWifi();
+			} else if (Intent.ACTION_BATTERY_CHANGED.equals(action)) {
+				updateBatteryFromIntent(intent);
 			}
 		}
 	};
@@ -112,6 +115,7 @@ public class StatusBarController {
 		ivWifi = activity.findViewById(R.id.ivWifi);
 		ivBluetooth = activity.findViewById(R.id.ivBluetooth);
 		ivAirplane = activity.findViewById(R.id.ivAirplane);
+		ivBattery = activity.findViewById(R.id.ivBattery);
 		sim1Container = activity.findViewById(R.id.sim1Container);
 		sim2Container = activity.findViewById(R.id.sim2Container);
 		tvCarrier1 = activity.findViewById(R.id.tvCarrier1);
@@ -135,6 +139,7 @@ public class StatusBarController {
 		updateWifi();
 		updateBluetooth();
 		updateCarriers();
+		updateBattery();
 
 		IntentFilter filter = new IntentFilter();
 		filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
@@ -142,6 +147,7 @@ public class StatusBarController {
 		filter.addAction(WifiManager.RSSI_CHANGED_ACTION);
 		filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
 		filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+		filter.addAction(Intent.ACTION_BATTERY_CHANGED);
 		activity.registerReceiver(stateReceiver, filter);
 
 		// 兜底：监听飞行模式设置变化。
@@ -441,6 +447,38 @@ public class StatusBarController {
 			}
 		}
 		tv.setText((name == null || name.isEmpty()) ? fallback : name);
+	}
+
+	// ── 电量 ──
+
+	/** 读取系统电量并更新图标（启动时调用，从 sticky intent 取）。 */
+	private void updateBattery() {
+		if (ivBattery == null) return;
+		Intent sticky = activity.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+		if (sticky != null) {
+			updateBatteryFromIntent(sticky);
+		}
+	}
+
+	/** 从 BATTERY_CHANGED 广播中读取电量百分比并更新图标。 */
+	@SuppressLint("MissingPermission")
+	private void updateBatteryFromIntent(Intent intent) {
+		if (ivBattery == null || intent == null) return;
+		int level = intent.getIntExtra("level", -1);
+		int scale = intent.getIntExtra("scale", 100);
+		if (level < 0 || scale <= 0) return;
+		int pct = level * 100 / scale;
+		int resId = batteryLevelToDrawable(pct);
+		ivBattery.setImageResource(resId);
+	}
+
+	@SuppressLint("MissingPermission")
+	private static int batteryLevelToDrawable(int pct) {
+		if (pct <= 20)  return R.drawable.ic_battery_0;
+		if (pct <= 40)  return R.drawable.ic_battery_25;
+		if (pct <= 60)  return R.drawable.ic_battery_50;
+		if (pct <= 80)  return R.drawable.ic_battery_75;
+		return R.drawable.ic_battery_100;
 	}
 
 	@SuppressLint("MissingPermission")
