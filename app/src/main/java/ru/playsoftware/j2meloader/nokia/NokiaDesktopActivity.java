@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.View;
 
@@ -52,6 +53,18 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		super.onPause();
 		if (statusBarController != null) {
 			statusBarController.stop();
+		}
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		// 运行时授予 READ_PHONE_STATE 后，重新注册双卡信号监听。
+		if (statusBarController != null
+				&& requestCode == 1001
+				&& grantResults.length > 0
+				&& grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+			statusBarController.onPermissionGranted();
 		}
 	}
 

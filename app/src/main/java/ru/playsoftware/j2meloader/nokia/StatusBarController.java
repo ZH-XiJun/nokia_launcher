@@ -12,12 +12,14 @@ import android.database.ContentObserver;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -36,8 +38,13 @@ import ru.playsoftware.j2meloader.R;
  * 双卡信号通过 SubscriptionManager 取得活动 SIM 列表，为每个 SIM 创建独立的
  * TelephonyManager 并监听其信号强度变化；单卡/无权限时退化为默认 TelephonyManager。
  * WiFi、蓝牙、飞行模式通过广播 + 轮询实时更新。
+ * <p>
+ * 部分机型（如 MIUI）在 Activity 启动瞬间订阅尚未就绪，或运行时权限是异步授予的，
+ * 因此额外注册 SubscriptionManager.OnSubscriptionsChangedListener，在订阅可用后
+ * 自动重新注册信号监听，避免 SIM2 永远读不到信号。
  */
 public class StatusBarController {
+	private static final String TAG = "NokiaSB";
 	private static final int REQ_PHONE_STATE = 1001;
 
 	private final NokiaBaseActivity activity;
@@ -50,6 +57,16 @@ public class StatusBarController {
 
 	private final SignalListener listener1 = new SignalListener(0);
 	private final SignalListener listener2 = new SignalListener(1);
+
+	// 订阅就绪/变化后自动重新注册信号监听。
+	private SubscriptionManager.OnSubscriptionsChangedListener subListener;
+
+	// SubscriptionManager 被厂商屏蔽、隐藏 API 被黑名单拒绝时，改用 createForSubscriptionId
+	// 探测常见 subId 后监听信号；probeTm1/2 记录各 listener 所挂载的 TM 以便注销。
+	private final Handler pollHandler = new Handler(Looper.getMainLooper());
+	private Runnable cellInfoPoller;
+	private static final long CELL_INFO_POLL_MS = 3000;
+	private TelephonyManager probeTm1, probeTm2;
 
 	// 飞行模式：部分机型不会派发 ACTION_AIRPLANE_MODE_CHANGED 广播，
 	// 故同时用 ContentObserver 监听 Settings.Global.AIRPLANE_MODE_ON 作为兜底。
@@ -128,10 +145,32 @@ public class StatusBarController {
 		ContentResolver cr = activity.getContentResolver();
 		cr.registerContentObserver(
 				Settings.Global.getUriFor(Settings.Global.AIRPLANE_MODE_ON), false, airplaneObserver);
+
+		// 订阅就绪后自动重注册信号监听（应对 MIUI 启动瞬间订阅未就绪的情况）。
+		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
+			subListener = new SubscriptionManager.OnSubscriptionsChangedListener() {
+				@Override
+				public void onSubscriptionsChanged() {
+					Log.d(TAG, "onSubscriptionsChanged -> reregister");
+					registerSignalListeners();
+					updateSimNotice();
+				}
+			};
+			subscriptionManager.addOnSubscriptionsChangedListener(subListener);
+		}
+	}
+
+	/** 运行时权限授予后调用，重新注册信号监听。 */
+	@SuppressLint("MissingPermission")
+	public void onPermissionGranted() {
+		Log.d(TAG, "onPermissionGranted -> reregister");
+		registerSignalListeners();
+		updateSimNotice();
 	}
 
 	/** 取消监听与广播。需在 Activity 的 onPause 中调用。 */
 	public void stop() {
+		stopCellInfoPolling();
 		unregisterSignalListeners();
 		try {
 			activity.unregisterReceiver(stateReceiver);
@@ -143,6 +182,14 @@ public class StatusBarController {
 		} catch (Exception ignore) {
 			// 忽略
 		}
+		if (subListener != null && subscriptionManager != null) {
+			try {
+				subscriptionManager.removeOnSubscriptionsChangedListener(subListener);
+			} catch (Exception ignore) {
+				// 忽略
+			}
+			subListener = null;
+		}
 	}
 
 	@SuppressLint("MissingPermission")
@@ -150,13 +197,21 @@ public class StatusBarController {
 		if (telephonyManager == null) {
 			return;
 		}
+		// 路径可能变化（订阅就绪/权限授予），先停掉可能运行的轮询，避免残留。
+		stopCellInfoPolling();
+		// 避免重复注册：先全部注销。
+		unregisterSignalListeners();
+
 		boolean usedSubscriptionPath = false;
 		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
 			List<SubscriptionInfo> subs = getActiveSubs();
+			Log.d(TAG, "registerSignalListeners subs.size=" + subs.size());
 			if (!subs.isEmpty()) {
 				usedSubscriptionPath = true;
 				for (int i = 0; i < subs.size() && i < 2; i++) {
 					int subId = subs.get(i).getSubscriptionId();
+					Log.d(TAG, "  sub i=" + i + " subId=" + subId
+							+ " slot=" + subs.get(i).getSimSlotIndex());
 					TelephonyManager tm = telephonyManager.createForSubscriptionId(subId);
 					PhoneStateListener l = (i == 0) ? listener1 : listener2;
 					tm.listen(l, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
@@ -167,10 +222,12 @@ public class StatusBarController {
 				}
 			}
 		}
-		// 关键修复：SubscriptionManager 路径拿不到活动 SIM 时（权限不足 / OEM 差异 /
-		// getActiveSubs() 返回空），退化为默认 TelephonyManager 监听，避免信号永远停在 0。
+		// SubscriptionManager 路径拿不到活动 SIM 时（MIUI 等屏蔽第三方读取）：
+		// 改用 createForSubscriptionId 探测常见 subId，为每张就绪的卡监听信号。
 		if (!usedSubscriptionPath) {
-			telephonyManager.listen(listener1, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+			Log.d(TAG, "registerSignalListeners fallback: probe subIds (both SIMs)");
+			probeSubIdsAndListen();
+			startSignalPolling();
 		}
 		refreshSignals();
 	}
@@ -190,16 +247,40 @@ public class StatusBarController {
 		}
 		// 始终取消默认监听（以防 fallback 路径注册了它）。
 		telephonyManager.listen(listener1, PhoneStateListener.LISTEN_NONE);
+		// 取消探测路径挂载在 createForSubscriptionId TM 上的监听。
+		if (probeTm1 != null) {
+			probeTm1.listen(listener1, PhoneStateListener.LISTEN_NONE);
+		}
+		if (probeTm2 != null) {
+			probeTm2.listen(listener2, PhoneStateListener.LISTEN_NONE);
+		}
 	}
 
 	@SuppressLint("MissingPermission")
 	private List<SubscriptionInfo> getActiveSubs() {
+		List<SubscriptionInfo> result = new java.util.ArrayList<>();
 		try {
 			List<SubscriptionInfo> subs = subscriptionManager.getActiveSubscriptionInfoList();
-			return subs == null ? java.util.Collections.<SubscriptionInfo>emptyList() : subs;
+			if (subs != null && !subs.isEmpty()) {
+				result.addAll(subs);
+				Log.d(TAG, "getActiveSubs via list: size=" + result.size());
+				return result;
+			}
+			// MIUI 等机型 getActiveSubscriptionInfoList() 可能返回空，
+			// 但按 slot 逐个查询仍可拿到活动 SIM。逐 slot 兜底。
+			for (int slot = 0; slot < 2; slot++) {
+				SubscriptionInfo info =
+						subscriptionManager.getActiveSubscriptionInfoForSimSlotIndex(slot);
+				Log.d(TAG, "getActiveSubs slot=" + slot + " info=" + (info != null
+						? ("subId=" + info.getSubscriptionId()) : "null"));
+				if (info != null) {
+					result.add(info);
+				}
+			}
 		} catch (Exception e) {
-			return java.util.Collections.emptyList();
+			Log.e(TAG, "getActiveSubs failed", e);
 		}
+		return result;
 	}
 
 	private void refreshSignals() {
@@ -208,8 +289,103 @@ public class StatusBarController {
 	}
 
 	/**
-	 * 根据实际检测到的 SIM 数量动态更新桌面“未插入SIM卡”提示：
+	 * SubscriptionManager 被厂商屏蔽（返回空）且隐藏 API 被黑名单拒绝时的兜底：
+	 * 探测常见 subscriptionId（1/2/0/3），用公开的 getSimState() 找出就绪的卡，
+	 * 为每张卡 createForSubscriptionId 后监听信号。全程只使用公开、非隐藏 API。
+	 */
+	@SuppressLint("MissingPermission")
+	private void probeSubIdsAndListen() {
+		probeTm1 = null;
+		probeTm2 = null;
+		if (telephonyManager == null) {
+			return;
+		}
+		if (Build.VERSION.SDK_INT < 24) {
+			// createForSubscriptionId 需 API 24，老版本只能读默认卡。
+			telephonyManager.listen(listener1, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+			return;
+		}
+		int[] candidates = {1, 2, 0, 3};
+		java.util.ArrayList<Integer> ready = new java.util.ArrayList<>();
+		for (int sub : candidates) {
+			try {
+				TelephonyManager tm = telephonyManager.createForSubscriptionId(sub);
+				if (tm.getSimState() == TelephonyManager.SIM_STATE_READY) {
+					ready.add(sub);
+				}
+			} catch (Exception e) {
+				Log.e(TAG, "probeSubIds createForSubscriptionId(" + sub + ") failed", e);
+			}
+			if (ready.size() >= 2) {
+				break;
+			}
+		}
+		Log.d(TAG, "probeSubIds ready=" + ready.size());
+		if (ready.isEmpty()) {
+			telephonyManager.listen(listener1, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+			return;
+		}
+		SignalListener[] ls = {listener1, listener2};
+		TelephonyManager[] holders = {null, null};
+		for (int i = 0; i < ready.size() && i < 2; i++) {
+			int sub = ready.get(i);
+			TelephonyManager tm = telephonyManager.createForSubscriptionId(sub);
+			holders[i] = tm;
+			tm.listen(ls[i], PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+			pollTmSignal(tm, ls[i]);
+		}
+		probeTm1 = holders[0];
+		probeTm2 = holders[1];
+		if (ready.size() <= 1 && listener2 != null) {
+			listener2.setLevel(0);
+		}
+	}
+
+	/** 初始主动读取一次信号（公开 API，非隐藏）。 */
+	@SuppressLint("MissingPermission")
+	private void pollTmSignal(TelephonyManager tm, SignalListener l) {
+		if (tm == null) {
+			return;
+		}
+		try {
+			if (Build.VERSION.SDK_INT >= 29) {
+				SignalStrength ss = tm.getSignalStrength();
+				if (ss != null) {
+					l.setLevel(ss.getLevel());
+					Log.d(TAG, "pollTmSignal slot=" + l.slot + " level=" + l.getLevel());
+				}
+			}
+		} catch (Exception e) {
+			Log.e(TAG, "pollTmSignal failed", e);
+		}
+	}
+
+	private void startSignalPolling() {
+		if (cellInfoPoller != null) {
+			return;
+		}
+		cellInfoPoller = new Runnable() {
+			@Override
+			public void run() {
+				pollTmSignal(probeTm1, listener1);
+				pollTmSignal(probeTm2, listener2);
+				pollHandler.postDelayed(this, CELL_INFO_POLL_MS);
+			}
+		};
+		pollHandler.postDelayed(cellInfoPoller, CELL_INFO_POLL_MS);
+	}
+
+	private void stopCellInfoPolling() {
+		if (cellInfoPoller != null) {
+			pollHandler.removeCallbacks(cellInfoPoller);
+			cellInfoPoller = null;
+		}
+	}
+
+	/**
+	 * 根据是否检测到 SIM 卡动态更新桌面“未插入SIM卡”提示：
 	 * 有 SIM 时隐藏提示，无 SIM 且非飞行模式时显示。
+	 * 即使订阅列表拿不到，只要实际监听到了任一卡的信号（或默认卡 READY），也视为有 SIM。
 	 */
 	private void updateSimNotice() {
 		if (simNotice == null) {
@@ -219,14 +395,20 @@ public class StatusBarController {
 			simNotice.setVisibility(View.GONE);
 			return;
 		}
-		int simCount = 0;
+		boolean hasSim = false;
 		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
-			simCount = getActiveSubs().size();
-		} else {
-			// 无法精确判断，保守假设有 SIM（否则系统不会显示信号）。
-			simCount = 1;
+			hasSim = !getActiveSubs().isEmpty();
 		}
-		simNotice.setVisibility(simCount > 0 ? View.GONE : View.VISIBLE);
+		// 订阅列表拿不到时，用实际监听到的信号兜底判断。
+		if (!hasSim && (listener1.getLevel() > 0 || listener2.getLevel() > 0)) {
+			hasSim = true;
+		}
+		if (!hasSim && telephonyManager != null
+				&& telephonyManager.getSimState() == TelephonyManager.SIM_STATE_READY) {
+			hasSim = true;
+		}
+		Log.d(TAG, "updateSimNotice hasSim=" + hasSim);
+		simNotice.setVisibility(hasSim ? View.GONE : View.VISIBLE);
 	}
 
 	@SuppressLint("MissingPermission")
@@ -384,6 +566,10 @@ public class StatusBarController {
 			this.slot = slot;
 		}
 
+		int getLevel() {
+			return level;
+		}
+
 		void setLevel(int level) {
 			this.level = level;
 			apply();
@@ -399,6 +585,7 @@ public class StatusBarController {
 					level = asuToLevel(signalStrength.getGsmSignalStrength());
 				}
 			}
+			Log.d(TAG, "onSignalStrengthsChanged slot=" + slot + " level=" + level);
 			apply();
 		}
 
