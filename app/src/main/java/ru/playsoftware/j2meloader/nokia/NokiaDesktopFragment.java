@@ -71,19 +71,19 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		}
 		TextView bl = host.findViewById(R.id.bottomLeft);
 		if (bl != null) {
-			bl.setText("相册");
-			bl.setOnClickListener(null);
+			bl.setText("功能表");
+			bl.setOnClickListener(v -> host.openMenu());
 		}
 		TextView bc = host.findViewById(R.id.bottomCenter);
 		if (bc != null) {
-			bc.setText("功能表");
-			bc.setVisibility(View.VISIBLE);
-			bc.setOnClickListener(v -> host.openMenu());
+			bc.setText("");
+			bc.setVisibility(View.GONE);
+			bc.setOnClickListener(null);
 		}
 		TextView br = host.findViewById(R.id.bottomRight);
 		if (br != null) {
-			br.setText("联系人");
-			br.setOnClickListener(null);
+			br.setText("桌面设置");
+			br.setOnClickListener(v -> host.openDesktopSettings());
 		}
 
 		// 清空上一轮的焦点状态，避免旧 View 遗留导致导航错乱或崩溃
@@ -96,11 +96,6 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		buildShortcutBar(view);
 		// 收集通知区焦点目标
 		collectNotifTargets(view);
-		// 加入底部功能表按钮作为最后一个焦点
-		View menuBtn = host.findViewById(R.id.bottomCenter);
-		if (menuBtn != null) {
-			focusTargets.add(menuBtn);
-		}
 
 		// 初始化选中第一个快捷项（如果有）
 		if (shortcutCount > 0) {
@@ -291,14 +286,16 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onSoftLeft() {
-		// 桌面左软键 = "相册"
+		NokiaLog.i("Desktop", "左软键：功能表");
+		requireActivity(); // ensure attached
+		((NokiaDesktopActivity) requireActivity()).openMenu();
 		return true;
 	}
 
 	@Override
 	public boolean onSoftRight() {
-		// 桌面右软键 = "联系人"
-		openContacts();
+		NokiaLog.i("Desktop", "右软键：桌面设置");
+		((NokiaDesktopActivity) requireActivity()).openDesktopSettings();
 		return true;
 	}
 
@@ -319,19 +316,12 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 	/** 通知区最后一个索引（不含） */
 	private int notifLast() { return shortcutCount + NOTIF_COUNT; }
 
-	/** 功能表按钮索引 */
-	private int menuBtnIdx() { return notifLast(); }
-
 	private boolean isInShortcuts() {
 		return focusIndex >= SHORTCUT_FIRST && focusIndex < shortcutLast();
 	}
 
 	private boolean isInNotifications() {
 		return focusIndex >= notifFirst() && focusIndex < notifLast();
-	}
-
-	private boolean isMenuBtn() {
-		return focusIndex == menuBtnIdx();
 	}
 
 	private boolean moveUp() {
@@ -347,8 +337,6 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 				// 从通知区第一项上移 → 快捷栏最后一项
 				if (shortcutCount > 0) newIdx = shortcutLast() - 1;
 			}
-		} else if (isMenuBtn()) {
-			newIdx = Math.max(0, notifLast() - 1);
 		}
 		return applyFocus(newIdx);
 	}
@@ -361,10 +349,9 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 			if (focusIndex < notifLast() - 1) {
 				newIdx = focusIndex + 1;
 			} else {
-				newIdx = menuBtnIdx();
+				// 通知区最后一个 → 快捷栏第一个
+				if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
 			}
-		} else if (isMenuBtn()) {
-			if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
 		}
 		return applyFocus(newIdx);
 	}
@@ -380,8 +367,6 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 			}
 		} else if (isInNotifications()) {
 			if (shortcutCount > 0) newIdx = shortcutLast() - 1;
-		} else if (isMenuBtn()) {
-			newIdx = Math.max(0, notifLast() - 1);
 		}
 		return applyFocus(newIdx);
 	}
@@ -395,8 +380,6 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 				if (shortcutCount > 1) newIdx = SHORTCUT_FIRST;
 			}
 		} else if (isInNotifications()) {
-			if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
-		} else if (isMenuBtn()) {
 			if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
 		}
 		return applyFocus(newIdx);
