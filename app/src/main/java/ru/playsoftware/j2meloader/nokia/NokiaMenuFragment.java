@@ -273,15 +273,36 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 			}
 		}
 
-		// 最终顺序：固定槽位 → 百宝箱 → 按键绑定 → 其他应用（按名称排序）
+		// 最终顺序：固定槽位 → 百宝箱 → 按键绑定 → S60匹配应用（按名） → 未匹配应用（按名）
 		items.addAll(pinned);
-		Drawable boxIcon = safeDrawable(host, R.drawable.ic_nokia_box);
+
+		// 百宝箱图标：优先用 S60 应用程序图标
+		Drawable boxIcon = safeDrawable(host, R.drawable.s60_app);
+		if (boxIcon == null) boxIcon = safeDrawable(host, R.drawable.ic_nokia_box);
 		Drawable kbIcon = safeDrawable(host, R.drawable.ic_nokia_settings);
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_BOX, "百宝箱", boxIcon, null));
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_KEYBIND, "按键绑定", kbIcon, null));
-		items.addAll(pool);
 
-		NokiaLog.i("Menu", "最终列表（固定槽位 " + pinned.size() + " + 特殊入口 + 其他 " + pool.size() + "）共 " + items.size() + " 项");
+		// 将 pool 拆分为已匹配 S60 图标 和 未匹配，匹配的排在前面
+		List<NokiaAppItem> matchedPool = new ArrayList<>();
+		List<NokiaAppItem> unmatchedPool = new ArrayList<>();
+		for (NokiaAppItem app : pool) {
+			int resId = NokiaS60IconMap.getIconForItem(app);
+			if (resId != 0) {
+				matchedPool.add(app);
+			} else {
+				unmatchedPool.add(app);
+			}
+		}
+		// 两组内部均按名称排序
+		Comparator<NokiaAppItem> labelCmp = (a, b) -> a.label.compareToIgnoreCase(b.label);
+		Collections.sort(matchedPool, labelCmp);
+		Collections.sort(unmatchedPool, labelCmp);
+
+		items.addAll(matchedPool);
+		items.addAll(unmatchedPool);
+
+		NokiaLog.i("Menu", "最终列表（固定槽位 " + pinned.size() + " + 特殊入口 + 匹配 " + matchedPool.size() + " + 未匹配 " + unmatchedPool.size() + "）共 " + items.size() + " 项");
 		totalPages = Math.max(1, (int) Math.ceil((double) items.size() / perPage));
 	}
 

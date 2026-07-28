@@ -230,4 +230,15 @@ public class NokiaS60IconMap {
 
 		return 0; // 无匹配，保留原始图标
 	}
+
+	/**
+	 * 根据 NokiaAppItem 中的包名反查是否匹配 S60 图标。
+	 * 用于排序：能匹配到图标的排在前面。
+	 */
+	@DrawableRes
+	public static int getIconForItem(NokiaAppItem item) {
+		if (item == null || item.launchIntent == null
+				|| item.launchIntent.getComponent() == null) return 0;
+		return getIcon(item.launchIntent.getComponent().getPackageName());
+	}
 }
