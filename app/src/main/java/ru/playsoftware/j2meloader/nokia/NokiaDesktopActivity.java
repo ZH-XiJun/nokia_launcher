@@ -209,6 +209,12 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		switchFragment(new NokiaBoxFragment());
 	}
 
+	/** 打开桌面设置界面 */
+	public void openDesktopSettings() {
+		NokiaLog.i("Desktop", "导航 -> 桌面设置");
+		switchFragment(new NokiaDesktopSettingsFragment());
+	}
+
 	/** 通用打开一个 Fragment 并加入返回栈。 */
 	public void openFragment(Fragment fragment) {
 		switchFragment(fragment);

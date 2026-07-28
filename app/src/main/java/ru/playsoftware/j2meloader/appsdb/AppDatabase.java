@@ -29,7 +29,7 @@ public abstract class AppDatabase extends RoomDatabase {
 
 	public abstract AppItemDao appItemDao();
 
-	static synchronized AppDatabase open(Context context, String dir) {
+	public static synchronized AppDatabase open(Context context, String dir) {
 		return Room.databaseBuilder(
 				context.getApplicationContext(),
 				AppDatabase.class,

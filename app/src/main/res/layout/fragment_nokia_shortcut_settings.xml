@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 快捷栏应用选择界面 -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="240dp"
+    android:layout_height="wrap_content"
+    android:background="@android:color/transparent">
+
+    <!-- 计数提示 -->
+    <TextView
+        android:id="@+id/tvSelectedCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="4dp"
+        android:text="已选 0 / 0 项"
+        android:textColor="#FF9800"
+        android:textSize="10sp" />
+
+    <TextView
+        android:id="@+id/shortcutTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="4dp"
+        android:text="按确定键选择/取消"
+        android:textColor="#AAAAAA"
+        android:textSize="9sp" />
+
+    <ScrollView
+        android:id="@+id/appScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tvSelectedCount"
+        android:layout_marginTop="2dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/appListLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp" />
+    </ScrollView>
+</RelativeLayout>
