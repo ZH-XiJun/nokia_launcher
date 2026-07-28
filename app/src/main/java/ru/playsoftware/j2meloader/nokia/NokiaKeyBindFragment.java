@@ -15,6 +15,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 
 /**
  * 按键绑定设置界面。
@@ -219,6 +220,8 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 	/** 应用绑定并刷新列表。 */
 	private void applyBinding(int action, int keycode) {
 		keyBinding.setKeyCode(action, keycode);
+		// 桌面按键绑定变化后，同步到全局 JAR 设置的按键映射
+		NokiaGlobalProfile.syncKeyBindings(requireContext());
 		buildList();
 		setFocusIndex(focusIndex);
 	}

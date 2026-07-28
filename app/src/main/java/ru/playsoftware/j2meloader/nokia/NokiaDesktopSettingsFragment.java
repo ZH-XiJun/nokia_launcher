@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 
 /**
  * 桌面设置主菜单。纵向列表展示各项设置入口。
@@ -27,6 +28,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 			R.drawable.s60_gallery,          // 壁纸设置
 			R.drawable.s60_settings_alt,     // 桌面组件设置
 			R.drawable.s60_settings,         // 按键绑定
+			R.drawable.s60_settings_alt,     // JAR 全局设置
 	};
 
 	private static final String[] ITEM_NAMES = {
@@ -34,6 +36,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 			"壁纸设置",
 			"桌面组件设置",
 			"按键绑定",
+			"JAR 全局设置",
 	};
 
 	private View[] itemViews;
@@ -167,6 +170,10 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 			case 3:
 				NokiaLog.i("DesktopSettings", "按键绑定");
 				host.openFragment(new NokiaKeyBindFragment());
+				return true;
+			case 4:
+				NokiaLog.i("DesktopSettings", "进入 JAR 全局设置");
+				NokiaGlobalProfile.openGlobalSettings(requireContext());
 				return true;
 			default:
 				return false;

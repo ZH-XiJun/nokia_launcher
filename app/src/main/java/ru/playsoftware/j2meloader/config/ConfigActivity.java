@@ -67,6 +67,7 @@ import androidx.core.widget.TextViewCompat;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.base.BaseActivity;
 import ru.playsoftware.j2meloader.databinding.ActivityConfigBinding;
+import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 import ru.playsoftware.j2meloader.settings.KeyMapperActivity;
 import ru.playsoftware.j2meloader.util.FileUtils;
 import yuku.ambilwarna.AmbilWarnaDialog;
@@ -87,6 +88,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 	private ProfileModel params;
 	private FragmentManager fragmentManager;
 	private boolean isProfile;
+	private boolean isGlobalProfile;
 	private Display display;
 	private File configDir;
 	private String defProfile;
@@ -103,6 +105,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 		Intent intent = getIntent();
 		String action = intent.getAction();
 		isProfile = ACTION_EDIT_PROFILE.equals(action);
+		isGlobalProfile = isProfile && NokiaGlobalProfile.PROFILE_NAME.equals(intent.getDataString());
 		needShow = isProfile || ACTION_EDIT.equals(action);
 		String path = intent.getDataString();
 		if (path == null) {
@@ -114,7 +117,11 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 			setResult(RESULT_OK, new Intent().setData(intent.getData()));
 			configDir = new File(Config.getProfilesDir(), path);
 			workDir = Config.getEmulatorDir();
-			setTitle(path);
+			if (isGlobalProfile) {
+				setTitle("JAR 全局设置");
+			} else {
+				setTitle(path);
+			}
 		} else {
 			setTitle(intent.getStringExtra(KEY_MIDLET_NAME));
 			File appDir = new File(path);
@@ -815,6 +822,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 		} else if (id == R.id.show_key_mappings) {
 			Intent i = new Intent(getIntent().getAction(), Uri.parse(configDir.getPath()),
 					this, KeyMapperActivity.class);
+			i.putExtra(NokiaGlobalProfile.EXTRA_GLOBAL_PROFILE, isGlobalProfile);
 			startActivity(i);
 		}
 	}

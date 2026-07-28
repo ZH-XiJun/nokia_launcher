@@ -48,11 +48,15 @@ import ru.playsoftware.j2meloader.base.BaseActivity;
 import ru.playsoftware.j2meloader.config.ProfileModel;
 import ru.playsoftware.j2meloader.config.ProfilesManager;
 import ru.playsoftware.j2meloader.databinding.ActivityKeymapperBinding;
+import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 import ru.playsoftware.j2meloader.util.SparseIntArrayAdapter;
 
 public class KeyMapperActivity extends BaseActivity implements View.OnClickListener {
 	private static final String KEY_SAVE = "KEY_MAP_SAVE";
-	private final SparseIntArray defaultKeyMap = KeyMapper.getDefaultKeyMap();
+	private final boolean isGlobalProfile = NokiaGlobalProfile.isGlobalProfile(getIntent());
+	private final SparseIntArray defaultKeyMap = isGlobalProfile
+			? NokiaGlobalProfile.buildDesktopKeyMappings(this)
+			: KeyMapper.getDefaultKeyMap();
 	private final SparseIntArray idToCanvasKey = new SparseIntArray();
 	private final Rect popupRect = new Rect();
 	private SparseIntArray androidToMIDP;
@@ -229,7 +233,8 @@ public class KeyMapperActivity extends BaseActivity implements View.OnClickListe
 		SparseIntArray newMap = androidToMIDP;
 		SparseIntArray oldMap = params.keyMappings;
 		if (equalMaps(newMap, defaultKeyMap)) {
-			newMap = null;
+			// 全局 profile 的“默认”即桌面绑定，不能落空（否则新建 JAR 会丢失桌面按键映射）
+			newMap = isGlobalProfile ? defaultKeyMap.clone() : null;
 		}
 		if (!equalMaps(oldMap, newMap)) {
 			params.keyMappings = newMap;

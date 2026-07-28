@@ -10,6 +10,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 
 /**
  * 诺基亚风格界面的单一宿主 Activity。
@@ -35,6 +36,9 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 
 		statusBarController = new StatusBarController(this);
 		keyBinding = new NokiaKeyBinding(this);
+
+		// 确保全局 JAR 设置 profile 存在并设为默认
+		NokiaGlobalProfile.ensureGlobalProfile(this);
 
 		if (getSupportFragmentManager().findFragmentById(R.id.midPanel) == null) {
 			loadDesktopFragment();

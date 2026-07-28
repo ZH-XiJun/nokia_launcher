@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Environment;
+import android.util.Log;
 
 import java.io.File;
 
@@ -32,6 +33,7 @@ import androidx.preference.PreferenceManager;
 
 import ru.playsoftware.j2meloader.BuildConfig;
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 
 import static ru.playsoftware.j2meloader.util.Constants.*;
 
@@ -127,16 +129,48 @@ public class Config {
 	public static void startApp(Context context, String name, String path, boolean showSettings, String arguments) {
 		File appDir = new File(path);
 		String workDir = appDir.getParentFile().getParent();
-		File file = new File(workDir + Config.MIDLET_CONFIGS_DIR + appDir.getName());
-		if (showSettings || !file.exists()) {
+		File configDir = new File(workDir + Config.MIDLET_CONFIGS_DIR + appDir.getName());
+		if (showSettings) {
+			// 用户显式点「设置」：打开设置界面（沿用原行为）
+			Log.i("Config", "startApp: 显式打开设置界面 -> " + name);
 			Intent intent = new Intent(ACTION_EDIT, Uri.parse(path),
 					context, ConfigActivity.class);
 			intent.putExtra(KEY_MIDLET_NAME, name);
 			intent.putExtra(KEY_START_ARGUMENTS, arguments);
 			context.startActivity(intent);
-		} else {
+			return;
+		}
+		if (!configDir.exists()) {
+			// 新 JAR：自动套用默认（全局）profile 设置，然后直接启动，不再弹设置界面
+			NokiaGlobalProfile.ensureGlobalProfile(context);
+			String defProfile = PreferenceManager.getDefaultSharedPreferences(context)
+					.getString(PREF_DEFAULT_PROFILE, null);
+			if (defProfile != null) {
+				File defDir = new File(Config.getProfilesDir(), defProfile);
+				if (defDir.exists()) {
+					FileUtils.copyFiles(defDir, configDir, null);
+					Log.i("Config", "startApp: 新 JAR 套用默认 profile '" + defProfile
+							+ "' -> " + configDir.getAbsolutePath());
+				} else {
+					Log.w("Config", "startApp: 默认 profile 目录不存在: " + defDir);
+				}
+			} else {
+				Log.w("Config", "startApp: 未设置默认 profile，无法套用全局设置");
+			}
+		}
+		if (configDir.exists()) {
+			// 已有配置（或已套用全局设置）：直接启动
+			Log.i("Config", "startApp: 直接启动 -> " + name);
 			Intent intent = new Intent(Intent.ACTION_DEFAULT, Uri.parse(path),
 					context, MicroActivity.class);
+			intent.putExtra(KEY_MIDLET_NAME, name);
+			intent.putExtra(KEY_START_ARGUMENTS, arguments);
+			context.startActivity(intent);
+		} else {
+			// 没有任何兜底配置：仍走设置界面（保持原行为）
+			Log.i("Config", "startApp: 无默认配置，退回设置界面 -> " + name);
+			Intent intent = new Intent(ACTION_EDIT, Uri.parse(path),
+					context, ConfigActivity.class);
 			intent.putExtra(KEY_MIDLET_NAME, name);
 			intent.putExtra(KEY_START_ARGUMENTS, arguments);
 			context.startActivity(intent);
