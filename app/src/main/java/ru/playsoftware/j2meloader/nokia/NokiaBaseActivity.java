@@ -167,6 +167,42 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	}
 
 	/**
+	 * 设置底部栏三按钮文字。文字为空时自动隐藏对应 TextView，
+	 * 剩余按钮按 weight 平分剩余空间，避免底部出现空蓝色块。
+	 * 各碎片切到前台时都应调用一次，保证显示状态同步。
+	 */
+	protected void setBottomBar(String left, String center, String right) {
+		applyBottomText(findViewById(R.id.bottomLeft), left);
+		applyBottomText(findViewById(R.id.bottomCenter), center);
+		applyBottomText(findViewById(R.id.bottomRight), right);
+	}
+
+	private void applyBottomText(TextView tv, String text) {
+		if (tv == null) return;
+		if (text == null || text.isEmpty()) {
+			tv.setVisibility(View.GONE);
+		} else {
+			tv.setText(text);
+			tv.setVisibility(View.VISIBLE);
+		}
+	}
+
+	/**
+	 * 设置底部栏中间按钮的文字。文字为空时自动隐藏，避免底部中间出现空蓝色块。
+	 * 各碎片切到前台时都应调用一次，保证显示状态同步。
+	 */
+	protected void setBottomCenterText(String text) {
+		TextView bc = findViewById(R.id.bottomCenter);
+		if (bc == null) return;
+		if (text == null || text.isEmpty()) {
+			bc.setVisibility(View.GONE);
+		} else {
+			bc.setText(text);
+			bc.setVisibility(View.VISIBLE);
+		}
+	}
+
+	/**
 	 * 缩放某个碎片的根视图（240dp × 280dp 的设计内容）并锚定到中间容器。
 	 * 内容统一从左上角等比放大铺满整宽（240dp × scale = 屏幕宽）。
 	 * 垂直位置（顶部对齐 / 居中）必须在布局完成后，用容器真实高度减去缩放后的

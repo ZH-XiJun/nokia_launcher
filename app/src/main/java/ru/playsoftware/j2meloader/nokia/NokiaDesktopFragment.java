@@ -45,15 +45,18 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		TextView bl = host.findViewById(R.id.bottomLeft);
 		if (bl != null) {
 			bl.setText("相册");
+			bl.setOnClickListener(null);
 		}
 		TextView bc = host.findViewById(R.id.bottomCenter);
 		if (bc != null) {
 			bc.setText("功能表");
+			bc.setVisibility(View.VISIBLE);
 			bc.setOnClickListener(v -> host.openMenu());
 		}
 		TextView br = host.findViewById(R.id.bottomRight);
 		if (br != null) {
 			br.setText("联系人");
+			br.setOnClickListener(null);
 		}
 
 		// ----- 初始化焦点目标列表 -----

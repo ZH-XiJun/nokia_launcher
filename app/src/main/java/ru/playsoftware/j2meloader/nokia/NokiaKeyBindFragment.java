@@ -73,18 +73,16 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 
 		// 底部软键
 		TextView bl = host.findViewById(R.id.bottomLeft);
-		if (bl != null) {
-			bl.setText("选择");
-		}
+		if (bl != null) bl.setText("选择");
 		TextView bc = host.findViewById(R.id.bottomCenter);
-		if (bc != null) {
-			bc.setText("");
-		}
+		if (bc != null) bc.setText("");
 		TextView br = host.findViewById(R.id.bottomRight);
 		if (br != null) {
 			br.setText("返回");
 			br.setOnClickListener(v -> host.exitCurrent());
 		}
+		// 按键绑定列表页：左"选择" / 右"返回"，中间空 → 自动隐藏避免蓝色块
+		host.setBottomBar("选择", null, "返回");
 
 		buildList();
 
@@ -241,6 +239,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 		if (br != null) br.setText("覆盖");
 		TextView bc = host.findViewById(R.id.bottomCenter);
 		if (bc != null) bc.setText("选择");
+		host.setBottomBar("取消", "选择", "覆盖");
 
 		recordStatusBar.setVisibility(View.VISIBLE);
 		updateConfirmText();
@@ -278,6 +277,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 		if (br != null) br.setText("返回");
 		TextView bc = host.findViewById(R.id.bottomCenter);
 		if (bc != null) bc.setText("");
+		host.setBottomBar("选择", null, "返回");
 
 		recordStatusBar.setVisibility(View.GONE);
 		buildList();

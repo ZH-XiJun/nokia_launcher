@@ -36,18 +36,16 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 			title.setText("百宝箱");
 		}
 		TextView bl = host.findViewById(R.id.bottomLeft);
-		if (bl != null) {
-			bl.setText("");
-		}
+		if (bl != null) bl.setText("");
 		TextView bc = host.findViewById(R.id.bottomCenter);
-		if (bc != null) {
-			bc.setText("");
-		}
+		if (bc != null) bc.setText("");
 		TextView br = host.findViewById(R.id.bottomRight);
 		if (br != null) {
 			br.setText("退出");
 			br.setOnClickListener(v -> host.exitCurrent());
 		}
+		// 百宝箱：左/中按钮均空 → 自动隐藏避免蓝色块，仅保留右"退出"
+		host.setBottomBar(null, null, "退出");
 	}
 
 	// ---- NokiaFocusHost ----
