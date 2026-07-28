@@ -16,6 +16,23 @@
 8. **可配置**：提供桌面设置入口 + 复用 J2ME-Loader 自身设置入口；快捷栏可编辑。
 
 
+## 开发重心与入口说明（重要）
+
+**本仓库的开发重心已经转移到「诺基亚桌面」，而不是原本的 J2ME-Loader 主界面。**
+
+- 真正的桌面（Home / Launcher）入口是 **`ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity`**，它在 `AndroidManifest.xml` 中同时声明了 `LAUNCHER` + `HOME` + `DEFAULT` 三个 category，即应用图标入口和按 Home 键都会进入这个诺基亚桌面。
+- 原本的 **`MainActivity`** 是 J2ME-Loader 自带的启动器 / 文件选择器 / 应用列表界面，**它不再是本应用的主界面，也不是开发重点**。它只是作为「百宝箱」里启动 JAR 应用、以及复用其设置入口的底层壳存在。
+- 因此，调试、截图、功能验证时，应当启动 / 操作的是 `NokiaDesktopActivity`，而不是 `MainActivity`。例如：
+  ```bash
+  adb shell am start -n ru.playsoftware.j2meloader.debug/ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity
+  ```
+  或直接模拟按 Home 键进入桌面：
+  ```bash
+  adb shell input keyevent KEYCODE_HOME
+  ```
+- 新增功能、改 UI、加逻辑时，优先在 `app/src/main/java/ru/playsoftware/j2meloader/nokia/` 目录下的诺基亚桌面相关代码中进行，而非 J2ME-Loader 原有的 `MainActivity` 等模块。
+
+
 ## J2ME-Loader介绍
 
 J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Java ME games by reimplementing the J2ME APIs on top of the Android runtime and translating MIDlet bytecode to run on Android. This repo is a fork of J2meLoader. It is a standard multi-module Gradle/Android project (Groovy DSL, AGP 8.5.1, Gradle 8.7). A skill documenting the local Gradle network/signing fixes lives at `.claude/skills/android-gradle-build` (read it before changing build config or signing).
@@ -99,11 +116,11 @@ This is not a normal app — it is an emulator, so most of the "application logi
 
 **Emulator core `org.microemu`.** A fork of the MicroEmu Java ME emulator handles class loading, the MIDlet lifecycle, and the event loop. `javax.microedition.shell.MicroActivity` (plus `MidletThread`/`MidletSystem`) is what actually starts and drives a MIDlet.
 
-**Two-process isolation.** `MainActivity` (the launcher, file picker, app list) runs in the default process. The game itself runs in a separate `:midlet` process via `MicroActivity` (`android:process=":midlet"`, see `AndroidManifest.xml`), so a crashing MIDlet does not take down the host app. `com.nokia.mid.ui.NotificationBroadcastReceiver` also lives in `:midlet`.
+**Two-process isolation.** `MainActivity` (the original J2ME-Loader launcher, file picker, app list) runs in the default process — note that it is **no longer the app's main UI**; the actual Home/desktop entry is `NokiaDesktopActivity` (see 开发重心与入口说明). The game itself runs in a separate `:midlet` process via `MicroActivity` (`android:process=":midlet"`, see `AndroidManifest.xml`), so a crashing MIDlet does not take down the host app. `com.nokia.mid.ui.NotificationBroadcastReceiver` also lives in `:midlet`.
 
 **Native 3D via NDK.** `app/src/main/cpp` builds two shared libraries through ndkBuild (`Android.mk`): `javam3g` (Mascot Capsule 3D `m3g` over OpenGL ES 1.1, providing `javax.microedition.m3g`) and `micro3d` (Micro3D V3 engine bindings). This native code is why the project pins the older NDK 22.1.7171670 and why Gradle needs the NDK installed.
 
-**App shell in `ru.playsoftware.j2meloader`.** The Android-side UI and services: `MainActivity`, `ConfigActivity`, `SettingsActivity`, `KeyMapperActivity`, Room database (per-app configs), file picker, and `storage.DocumentProvider`. `com.*`/`mmpp.*` hold Nokia UI extensions (`com.nokia.mid.ui`) and Mascot Capsule helpers.
+**App shell in `ru.playsoftware.j2meloader`.** The Android-side UI and services: `MainActivity` (legacy J2ME-Loader launcher, not the main UI anymore), `NokiaDesktopActivity` (the real Home/desktop — the current development focus), `ConfigActivity`, `SettingsActivity`, `KeyMapperActivity`, Room database (per-app configs), file picker, and `storage.DocumentProvider`. The Nokia desktop code lives under `ru.playsoftware.j2meloader.nokia.*`. `com.*`/`mmpp.*` hold Nokia UI extensions (`com.nokia.mid.ui`) and Mascot Capsule helpers.
 
 **Product flavors (`app/build.gradle`).** `play`/`open`/`fdroid`/`dev` are the full emulator (`FULL_EMULATOR=true`), differing only in distribution channel, `versionNameSuffix`, and proguard files; `open` is the non-Play build and the one to use for local development. `midlet` is special: `FULL_EMULATOR=false`, and instead of building the emulator it builds a standalone Android APK *from a J2ME app's sources* (read from `src/midlet/resources/MIDLET-META-INF/MANIFEST.MF`). `dev` calls `generateVersionCode()` (git rev-list) at configuration time — a non-git working copy falls back to version code 1 (already patched in `app/build.gradle`).
 
