@@ -203,7 +203,12 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 				View panel = (View) parent;
 				panel.setVisibility(View.VISIBLE);
 				int panelH = panel.getHeight();
-				int visualH = (int) (MID_H * fDensity * fScale);
+				// 垂直可视高度取内容实际布局高度（变高网格也适用），
+				// 仅当布局尚未完成时回退到设计基准 MID_H。
+				int contentH = content.getHeight();
+				int visualH = contentH > 0
+						? (int) (contentH * fScale)
+						: (int) (MID_H * fDensity * fScale);
 				int offset = topAlign ? 0 : Math.max(0, (panelH - visualH) / 2);
 				content.setY(offset);
 			}
