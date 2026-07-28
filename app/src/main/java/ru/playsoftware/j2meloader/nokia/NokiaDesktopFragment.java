@@ -123,6 +123,9 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		}
 		container.removeAllViews();
 
+		// 初始化 S60 图标缓存，确保快捷栏图标与功能表一致
+		NokiaS60IconMap.init(requireActivity().getPackageManager());
+
 		List<ShortcutApp> apps = settingsStorage.getShortcutApps();
 		shortcutApps.clear();
 		shortcutApps.addAll(apps);
@@ -188,9 +191,25 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 				if (d != null) return d;
 			}
 			if (app.type == ShortcutApp.TYPE_ANDROID) {
-				// 安卓图标从 PackageManager 加载
 				Intent intent = app.getLaunchIntent();
 				if (intent != null && intent.getComponent() != null) {
+					String pkg = intent.getComponent().getPackageName();
+
+					// 优先使用 S60 风格图标，与功能表保持一致
+					int s60Res = NokiaS60IconMap.getIcon(pkg);
+					if (s60Res != 0) {
+						try {
+							Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
+							if (s60Icon != null) {
+								NokiaLog.d("Desktop", "快捷栏应用 " + app.label + " 使用 S60 图标");
+								return s60Icon;
+							}
+						} catch (Exception e) {
+							NokiaLog.w("Desktop", "加载 S60 图标失败: " + app.label);
+						}
+					}
+
+					// 兜底：使用应用真实图标
 					try {
 						return requireActivity().getPackageManager()
 								.getActivityIcon(intent.getComponent());
