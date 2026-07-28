@@ -26,14 +26,14 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 			R.drawable.ic_nokia_settings,   // 快捷栏设置
 			R.drawable.s60_gallery,          // 壁纸设置
 			R.drawable.s60_settings_alt,     // 桌面组件设置
-			R.drawable.s60_settings,         // 软键功能设置
+			R.drawable.s60_settings,         // 按键绑定
 	};
 
 	private static final String[] ITEM_NAMES = {
 			"顶部快捷栏设置",
 			"壁纸设置",
 			"桌面组件设置",
-			"软键功能设置",
+			"按键绑定",
 	};
 
 	private View[] itemViews;
@@ -165,7 +165,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 				// TODO: 桌面组件设置
 				return true;
 			case 3:
-				NokiaLog.i("DesktopSettings", "软键功能设置");
+				NokiaLog.i("DesktopSettings", "按键绑定");
 				host.openFragment(new NokiaKeyBindFragment());
 				return true;
 			default:
