@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -27,6 +28,13 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 	private int focusIndex = 0;
 	private boolean recording = false;
 	private int recordingAction = -1;
+
+	// 冲突确认模式状态（复用 Fragment 自身导航，不依赖 AlertDialog）
+	private boolean confirming = false;
+	private int confirmAction = -1;
+	private int confirmKeycode = -1;
+	private int confirmOccupied = -1;
+	private int confirmChoice = 0; // 0=取消, 1=覆盖
 
 	private LinearLayout bindListContainer;
 	private LinearLayout recordStatusBar;
@@ -194,13 +202,84 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 		int action = recordingAction;
 		recording = false;
 		recordStatusBar.setVisibility(View.GONE);
+		recordingAction = -1;
 
 		NokiaLog.i("KeyBind", "录制完成 action=" + NokiaKeyBinding.getActionName(action)
 				+ " 捕获 " + NokiaLog.keyName(keycode));
-		keyBinding.setKeyCode(action, keycode);
-		recordingAction = -1;
 
-		// 刷新列表
+		int occupied = keyBinding.getActionForKeyCode(keycode);
+		if (occupied >= 0 && occupied != action) {
+			// 该键已被其它动作占用，进入确认模式（复用方向键/确认/返回导航）
+			NokiaLog.w("KeyBind", "录制冲突：" + NokiaLog.keyName(keycode)
+					+ " 已被 " + NokiaKeyBinding.getActionName(occupied) + " 占用");
+			enterConfirm(action, occupied, keycode);
+			return;
+		}
+		applyBinding(action, keycode);
+	}
+
+	/** 应用绑定并刷新列表。 */
+	private void applyBinding(int action, int keycode) {
+		keyBinding.setKeyCode(action, keycode);
+		buildList();
+		setFocusIndex(focusIndex);
+	}
+
+	/** 进入冲突确认模式：复用 Fragment 自身的方向键/确认/返回导航选择覆盖或取消。 */
+	private void enterConfirm(int action, int occupied, int keycode) {
+		confirming = true;
+		confirmAction = action;
+		confirmOccupied = occupied;
+		confirmKeycode = keycode;
+		confirmChoice = 0; // 默认选中“取消”，避免误覆盖
+
+		// 更新底部软键提示（若软键已绑定则可用，否则用方向键/确认同样可行）
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		TextView bl = host.findViewById(R.id.bottomLeft);
+		if (bl != null) bl.setText("取消");
+		TextView br = host.findViewById(R.id.bottomRight);
+		if (br != null) br.setText("覆盖");
+		TextView bc = host.findViewById(R.id.bottomCenter);
+		if (bc != null) bc.setText("选择");
+
+		recordStatusBar.setVisibility(View.VISIBLE);
+		updateConfirmText();
+		NokiaLog.i("KeyBind", "进入冲突确认模式，等待选择（←→切换，确认选定，返回=取消）");
+	}
+
+	private void updateConfirmText() {
+		String cancel = (confirmChoice == 0) ? "[取消]" : " 取消 ";
+		String over = (confirmChoice == 1) ? "[覆盖]" : " 覆盖 ";
+		recordStatusText.setText("冲突：" + NokiaLog.keyName(confirmKeycode)
+				+ " 已被「" + NokiaKeyBinding.getActionName(confirmOccupied) + "」占用  "
+				+ cancel + over + "（←→切换，确认选定）");
+	}
+
+	/** 执行用户的选择并退出确认模式。 */
+	private void doConfirm() {
+		if (confirmChoice == 1) {
+			NokiaLog.i("KeyBind", "用户选择覆盖：解除 "
+					+ NokiaKeyBinding.getActionName(confirmOccupied)
+					+ "，绑定到 " + NokiaKeyBinding.getActionName(confirmAction));
+			applyBinding(confirmAction, confirmKeycode);
+		} else {
+			NokiaLog.i("KeyBind", "用户取消覆盖，保持 "
+					+ NokiaKeyBinding.getActionName(confirmOccupied) + " 不变");
+			Toast.makeText(requireContext(), "已取消，绑定未更改", Toast.LENGTH_SHORT).show();
+		}
+		confirming = false;
+		confirmAction = confirmKeycode = confirmOccupied = -1;
+
+		// 恢复底部软键文案
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		TextView bl = host.findViewById(R.id.bottomLeft);
+		if (bl != null) bl.setText("选择");
+		TextView br = host.findViewById(R.id.bottomRight);
+		if (br != null) br.setText("返回");
+		TextView bc = host.findViewById(R.id.bottomCenter);
+		if (bc != null) bc.setText("");
+
+		recordStatusBar.setVisibility(View.GONE);
 		buildList();
 		setFocusIndex(focusIndex);
 	}
@@ -214,6 +293,17 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onDirection(int direction) {
+		if (confirming) {
+			// 左右切换选择；上下忽略
+			if (direction == NokiaKeyBinding.ACTION_LEFT
+					|| direction == NokiaKeyBinding.ACTION_RIGHT) {
+				confirmChoice = (confirmChoice == 0) ? 1 : 0;
+				updateConfirmText();
+				NokiaLog.d("KeyBind", "冲突确认切换选择 -> "
+						+ (confirmChoice == 0 ? "取消" : "覆盖"));
+			}
+			return true;
+		}
 		NokiaLog.d("KeyBind", "onDirection " + NokiaKeyBinding.getActionName(direction)
 				+ " focus=" + focusIndex);
 		if (focusIndex < 0) {
@@ -234,6 +324,10 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onSelect() {
+		if (confirming) {
+			doConfirm();
+			return true;
+		}
 		NokiaLog.d("KeyBind", "onSelect focus=" + focusIndex);
 		if (focusIndex >= 0 && focusIndex < NokiaKeyBinding.ACTION_COUNT) {
 			startRecording(focusIndex);
@@ -243,12 +337,22 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onSoftLeft() {
+		if (confirming) {
+			confirmChoice = 0;
+			doConfirm();
+			return true;
+		}
 		NokiaLog.d("KeyBind", "onSoftLeft -> 等同选择");
 		return onSelect(); // 左软键 = 选择 = 进入录制
 	}
 
 	@Override
 	public boolean onSoftRight() {
+		if (confirming) {
+			confirmChoice = 1;
+			doConfirm();
+			return true;
+		}
 		NokiaLog.d("KeyBind", "onSoftRight -> 返回");
 		// 右软键 = 返回
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
@@ -257,6 +361,12 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onBack() {
+		if (confirming) {
+			// 返回 = 取消
+			confirmChoice = 0;
+			doConfirm();
+			return true;
+		}
 		NokiaLog.d("KeyBind", "onBack -> 返回");
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;

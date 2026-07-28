@@ -88,11 +88,22 @@ public class NokiaKeyBinding {
 		}
 	}
 
-	/** 保存指定动作的按键码。 */
+	/** 保存指定动作的按键码。若该键已被其它动作占用，自动解除原绑定，保证一对一。 */
 	public void setKeyCode(int action, int keycode) {
 		if (action < 0 || action >= ACTION_COUNT) {
 			NokiaLog.w("KeyBinding", "setKeyCode 忽略非法 action=" + action);
 			return;
+		}
+		// 清除其它动作中已占用该 keycode 的绑定，避免一个键对应多个动作
+		if (keycode != KeyEvent.KEYCODE_UNKNOWN) {
+			for (int i = 0; i < ACTION_COUNT; i++) {
+				if (i != action && keycodes[i] == keycode) {
+					keycodes[i] = KeyEvent.KEYCODE_UNKNOWN;
+					prefs.edit().putInt(PREF_KEYS[i], KeyEvent.KEYCODE_UNKNOWN).apply();
+					NokiaLog.i("KeyBinding", "清除冲突绑定 "
+							+ getActionName(i) + "（原占用 " + NokiaLog.keyName(keycode) + "）");
+				}
+			}
 		}
 		int old = keycodes[action];
 		keycodes[action] = keycode;
