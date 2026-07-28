@@ -2,7 +2,7 @@
 <!-- 共用的诺基亚顶部状态栏：三页复用。
      注意：顶栏由基类以"原生分辨率"渲染（不做 setScaleX 缩放），以保证矢量图标清晰不模糊；
      仅高度按设计比例(18dp*scale)放大，由代码设置。内层宽度铺满屏幕。
-     左侧图标簇：SIM1 信号 / SIM2 信号 / 电池 / WiFi / 蓝牙 / 飞行模式（后三项按需显示）。
+     左侧图标簇：SIM1 信号 / SIM2 信号 / WiFi / 蓝牙 / 飞行模式（后三项按需显示）；右侧显示电池和时钟。
      标题(topTitle)由每个页面在运行时设置。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/topPanel"
@@ -73,15 +73,6 @@
                     android:src="@drawable/ic_signal_0" />
             </LinearLayout>
 
-            <!-- 电池（保持不变） -->
-            <ImageView
-                android:id="@+id/ivBattery"
-                android:layout_width="24dp"
-                android:layout_height="13dp"
-                android:layout_marginStart="8dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_nokia_battery" />
-
             <!-- WiFi（开启时显示） -->
             <ImageView
                 android:id="@+id/ivWifi"
@@ -131,6 +122,15 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1" />
+
+        <!-- 电池（右侧） -->
+        <ImageView
+            android:id="@+id/ivBattery"
+            android:layout_width="24dp"
+            android:layout_height="13dp"
+            android:layout_marginEnd="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_nokia_battery" />
 
         <TextView
             android:id="@+id/tvTime"
