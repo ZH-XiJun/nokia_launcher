@@ -29,6 +29,10 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 调试方面，使用adb截图理解，再使用adb 模拟点击来操作。
 
 
+## 重要事项
+
+在应该加日志的地方，都要加上日志输出，尽可能多的加日志。方便排查问题
+
 
 ## 分辨率适配
 

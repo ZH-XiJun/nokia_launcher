@@ -13,7 +13,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 /** 百宝箱中间内容碎片。 */
-public class NokiaBoxFragment extends Fragment {
+public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	@Nullable
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -48,5 +48,28 @@ public class NokiaBoxFragment extends Fragment {
 			br.setText("退出");
 			br.setOnClickListener(v -> host.exitCurrent());
 		}
+	}
+
+	// ---- NokiaFocusHost ----
+
+	@Override
+	public boolean onDirection(int direction) { return false; }
+
+	@Override
+	public boolean onSelect() { return false; }
+
+	@Override
+	public boolean onSoftLeft() { return false; }
+
+	@Override
+	public boolean onSoftRight() {
+		((NokiaDesktopActivity) requireActivity()).exitCurrent();
+		return true;
+	}
+
+	@Override
+	public boolean onBack() {
+		((NokiaDesktopActivity) requireActivity()).exitCurrent();
+		return true;
 	}
 }

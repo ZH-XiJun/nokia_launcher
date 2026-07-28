@@ -51,9 +51,12 @@
             android:paddingBottom="4dp">
 
             <LinearLayout
+                android:id="@+id/shortcutPhone"
                 android:layout_width="36dp"
                 android:layout_height="34dp"
                 android:layout_marginEnd="8dp"
+                android:focusable="true"
+                android:clickable="true"
                 android:gravity="center"
                 android:orientation="vertical">
                 <ImageView
@@ -63,9 +66,12 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/shortcutMusic"
                 android:layout_width="36dp"
                 android:layout_height="34dp"
                 android:layout_marginEnd="8dp"
+                android:focusable="true"
+                android:clickable="true"
                 android:gravity="center"
                 android:orientation="vertical">
                 <TextView
@@ -78,9 +84,12 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/shortcutVideo"
                 android:layout_width="36dp"
                 android:layout_height="34dp"
                 android:layout_marginEnd="8dp"
+                android:focusable="true"
+                android:clickable="true"
                 android:gravity="center"
                 android:orientation="vertical">
                 <FrameLayout
@@ -103,9 +112,12 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/shortcutCalendar"
                 android:layout_width="36dp"
                 android:layout_height="34dp"
                 android:layout_marginEnd="8dp"
+                android:focusable="true"
+                android:clickable="true"
                 android:gravity="center"
                 android:orientation="vertical">
                 <FrameLayout
@@ -128,8 +140,11 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/shortcutFolder"
                 android:layout_width="36dp"
                 android:layout_height="34dp"
+                android:focusable="true"
+                android:clickable="true"
                 android:gravity="center"
                 android:orientation="vertical">
                 <ImageView
@@ -152,8 +167,11 @@
         android:paddingBottom="4dp">
 
         <LinearLayout
+            android:id="@+id/notifMusic"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:focusable="true"
+            android:clickable="true"
             android:gravity="center_vertical"
             android:paddingTop="3dp"
             android:paddingBottom="3dp">
@@ -174,8 +192,11 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/notifRadio"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:focusable="true"
+            android:clickable="true"
             android:gravity="center_vertical"
             android:paddingTop="3dp"
             android:paddingBottom="3dp">
@@ -193,8 +214,11 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/notifCalendar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:focusable="true"
+            android:clickable="true"
             android:gravity="center_vertical"
             android:paddingTop="3dp"
             android:paddingBottom="3dp">
