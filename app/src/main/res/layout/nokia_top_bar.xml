@@ -1,18 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 共用的诺基亚顶部状态栏：三页复用。
      注意：顶栏由基类以"原生分辨率"渲染（不做 setScaleX 缩放），以保证矢量图标清晰不模糊；
-     仅高度按设计比例(18dp*scale)放大，由代码设置。内层宽度铺满屏幕。
-     左侧图标簇：SIM1 信号 / SIM2 信号 / WiFi / 蓝牙 / 飞行模式（后三项按需显示）；右侧显示电池和时钟。
-     标题(topTitle)由每个页面在运行时设置。 -->
+     仅高度按设计比例(TOP_H*scale)放大，由代码设置。内层宽度铺满屏幕。
+     顶部第一行：左侧图标簇(SIM1/SIM2 信号 + WiFi + 蓝牙 + 飞行模式)；右侧电池和时钟。
+     顶部第二行：双卡运营商名(无 SIM 时隐藏)。
+     标题(topTitle)由每个页面在运行时设置（顶部第一行居中位置）。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/topPanel"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:orientation="vertical"
     android:visibility="invisible">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:paddingStart="6dp"
         android:paddingEnd="6dp">
@@ -140,5 +142,35 @@
             android:textColor="#FFFFFF"
             android:textSize="13sp"
             android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 双卡运营商名（横排）：始终显示，根据状态显示运营商名/飞行模式/无SIM -->
+    <LinearLayout
+        android:id="@+id/simCarrierContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="2dp">
+
+        <TextView
+            android:id="@+id/tvCarrier1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#FFFFFF"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/tvCarrier2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:text=""
+            android:textColor="#FFFFFF"
+            android:textSize="10sp" />
     </LinearLayout>
 </LinearLayout>

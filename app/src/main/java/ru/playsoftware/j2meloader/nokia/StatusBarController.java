@@ -395,44 +395,52 @@ public class StatusBarController {
 	}
 
 	/**
-	 * 根据是否检测到 SIM 卡动态更新桌面“未插入SIM卡”提示：
-	 * 有 SIM 时隐藏提示，无 SIM 且非飞行模式时显示。
-	 * 即使订阅列表拿不到，只要实际监听到了任一卡的信号（或默认卡 READY），也视为有 SIM。
-	/**
-	 * 在桌面顶部原“未插入SIM卡”提示位置显示两张卡的运营商名（横排）。
-	 * 飞行模式或无卡时隐藏容器；有卡则按每张卡对应的 TelephonyManager 读取运营商名，
-	 * 优先用网络运营商名，回退到 SIM 卡中的 SPN，读不到则留空。
+	 * 始终显示运营商行（避免顶部栏出现空白浪费）。
+	 *   - 双卡：分别显示两张卡的运营商名
+	 *   - 单卡：仅 tvCarrier1 显示运营商名
+	 *   - 飞行模式：tvCarrier1 显示「飞行模式」
+	 *   - 无 SIM：tvCarrier1 显示「无 SIM」
+	 * 优先用网络运营商名，回退到 SIM 卡中的 SPN，都读不到则按状态填占位文字。
 	 */
 	@SuppressLint("MissingPermission")
 	private void updateCarriers() {
 		if (simCarrierContainer == null) {
 			return;
 		}
-		if (isAirplaneModeOn()
-				|| (probeTm1 == null && probeTm2 == null
-				&& (listener1.getLevel() <= 0 && listener2.getLevel() <= 0))) {
-			simCarrierContainer.setVisibility(View.GONE);
+		simCarrierContainer.setVisibility(View.VISIBLE);
+
+		boolean airplane = isAirplaneModeOn();
+		boolean noAnyCard = (probeTm1 == null && probeTm2 == null
+				&& listener1.getLevel() <= 0 && listener2.getLevel() <= 0);
+
+		if (airplane) {
+			// 飞行模式：两卡槽位都标「飞行模式」
+			setCarrierOrFallback(tvCarrier1, null, "飞行模式");
+			setCarrierOrFallback(tvCarrier2, null, "飞行模式");
 			return;
 		}
-		simCarrierContainer.setVisibility(View.VISIBLE);
-		setCarrierText(tvCarrier1, probeTm1);
-		setCarrierText(tvCarrier2, probeTm2);
+
+		if (noAnyCard) {
+			// 未检测到任何 SIM
+			setCarrierOrFallback(tvCarrier1, null, "无 SIM");
+			setCarrierOrFallback(tvCarrier2, null, "");
+		} else {
+			setCarrierOrFallback(tvCarrier1, probeTm1, "");
+			setCarrierOrFallback(tvCarrier2, probeTm2, "");
+		}
 	}
 
 	@SuppressLint("MissingPermission")
-	private void setCarrierText(TextView tv, TelephonyManager tm) {
-		if (tv == null) {
-			return;
+	private void setCarrierOrFallback(TextView tv, TelephonyManager tm, String fallback) {
+		if (tv == null) return;
+		String name = null;
+		if (tm != null) {
+			name = tm.getNetworkOperatorName();
+			if (name == null || name.isEmpty()) {
+				name = tm.getSimOperatorName();
+			}
 		}
-		if (tm == null) {
-			tv.setText("");
-			return;
-		}
-		String name = tm.getNetworkOperatorName();
-		if (name == null || name.isEmpty()) {
-			name = tm.getSimOperatorName();
-		}
-		tv.setText(name == null ? "" : name);
+		tv.setText((name == null || name.isEmpty()) ? fallback : name);
 	}
 
 	@SuppressLint("MissingPermission")
