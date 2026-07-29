@@ -40,6 +40,9 @@ captures/
 .cxx
 keystore.properties
 
+# Build output distribution folder
+dist/
+
 # Agent / IDE data folders (do not commit)
 .codebuddy/
 .claude/
