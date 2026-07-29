@@ -76,7 +76,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 					LinearLayout.LayoutParams.MATCH_PARENT, dp(36)));
 			row.setPadding(dp(10), dp(4), dp(10), dp(4));
 			row.setClickable(true);
-			row.setFocusable(true);
+
 
 			// 图标
 			ImageView ivIcon = new ImageView(requireContext());

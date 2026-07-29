@@ -114,8 +114,8 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
 	private View createRow(int action) {
 		LinearLayout row = new LinearLayout(requireContext());
 		row.setOrientation(LinearLayout.HORIZONTAL);
-		row.setFocusable(true);
 		row.setClickable(true);
+
 		row.setPadding(12, 8, 12, 8);
 
 		// 左侧：动作名

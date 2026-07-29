@@ -267,7 +267,7 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 					LinearLayout.LayoutParams.MATCH_PARENT, dp(38)));
 			row.setPadding(dp(8), dp(3), dp(8), dp(3));
 			row.setClickable(true);
-			row.setFocusable(true);
+
 
 			// 图标
 			ImageView iv = new ImageView(requireContext());

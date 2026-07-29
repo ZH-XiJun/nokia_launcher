@@ -187,7 +187,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		cell.setGravity(Gravity.CENTER);
 		cell.setPadding(dp(4), dp(4), dp(4), dp(4));
 		cell.setClickable(true);
-		cell.setFocusable(true);
+
 		cell.setTag(app);
 
 		ImageView iv = new ImageView(ctx);

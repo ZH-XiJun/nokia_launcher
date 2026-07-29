@@ -37,8 +37,8 @@ public class NokiaKeyBinding {
 			KeyEvent.KEYCODE_DPAD_LEFT,             // left
 			KeyEvent.KEYCODE_DPAD_RIGHT,            // right
 			KeyEvent.KEYCODE_DPAD_CENTER,           // select
-			KeyEvent.KEYCODE_UNKNOWN,               // soft_left (未绑定)
-			KeyEvent.KEYCODE_UNKNOWN,               // soft_right (未绑定)
+			KeyEvent.KEYCODE_SOFT_LEFT,             // soft_left
+			KeyEvent.KEYCODE_SOFT_RIGHT,            // soft_right
 			KeyEvent.KEYCODE_BACK,                  // back
 	};
 
@@ -156,14 +156,35 @@ public class NokiaKeyBinding {
 					+ event.getAction() + " keyCode=" + NokiaLog.keyName(event.getKeyCode()));
 			return -1;
 		}
-		int action = getActionForKeyCode(event.getKeyCode());
-		if (action < 0) {
-			NokiaLog.d("KeyBinding", "resolveAction " + NokiaLog.keyName(event.getKeyCode())
-					+ " -> 未绑定(-1)");
-		} else {
-			NokiaLog.d("KeyBinding", "resolveAction " + NokiaLog.keyName(event.getKeyCode())
+		int keyCode = event.getKeyCode();
+		int action = getActionForKeyCode(keyCode);
+		if (action >= 0) {
+			NokiaLog.d("KeyBinding", "resolveAction " + NokiaLog.keyName(keyCode)
 					+ " -> " + getActionName(action) + "(" + action + ")");
+			return action;
 		}
-		return action;
+
+		// 通用确认键兜底：未显式绑定，但属于"确认/OK"按键族时，视为确认动作。
+		// 这样即使清除数据后默认绑定里没有该键（如设备 OK 键发的是 ENTER），
+		// 确认键也能直接生效，避免事件穿透到列表第一行（已显式绑定的仍优先）。
+		if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+				|| keyCode == KeyEvent.KEYCODE_ENTER
+				|| keyCode == KeyEvent.KEYCODE_SPACE
+				|| keyCode == KeyEvent.KEYCODE_BUTTON_A) {
+			NokiaLog.i("KeyBinding", "resolveAction 通用确认键兜底 "
+					+ NokiaLog.keyName(keyCode) + " -> 确认(" + ACTION_SELECT + ")");
+			return ACTION_SELECT;
+		}
+
+		// 菜单键兜底为左软键（部分设备没有独立软键，用菜单键代替"选择"）
+		if (keyCode == KeyEvent.KEYCODE_MENU) {
+			NokiaLog.i("KeyBinding", "resolveAction 菜单键兜底 "
+					+ NokiaLog.keyName(keyCode) + " -> 左软键(" + ACTION_SOFT_LEFT + ")");
+			return ACTION_SOFT_LEFT;
+		}
+
+		NokiaLog.d("KeyBinding", "resolveAction " + NokiaLog.keyName(keyCode)
+				+ " -> 未绑定(-1)");
+		return -1;
 	}
 }
