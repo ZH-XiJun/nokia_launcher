@@ -181,7 +181,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	private void buildGrid() {
 		if (appContainer == null) return;
 		appContainer.removeAllViews();
-		totalGridCells = 1 + appItems.size(); // 安装jar + 已装应用
+		totalGridCells = 2 + appItems.size(); // 安装 + JAR 全局设置 + 已装应用
 		int totalRows = (int) Math.ceil((double) totalGridCells / COLS);
 		gridCellViews = new View[totalGridCells];
 		subMenuItemViews = null;
@@ -205,11 +205,14 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 					});
 
 					if (pos == 0) {
-						// "安装jar" 入口
+						// "安装" 入口
 						populateInstallCell(cell);
+					} else if (pos == 1) {
+						// "JAR 全局设置" 入口
+						populateGlobalProfileCell(cell);
 					} else {
 						// JAR 应用
-						AppItem app = appItems.get(pos - 1);
+						AppItem app = appItems.get(pos - 2);
 						populateAppCell(cell, app);
 					}
 					gridCellViews[pos] = cell;
@@ -255,7 +258,28 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 		TextView tv = new TextView(requireContext());
 		tv.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-		tv.setText("安装jar");
+		tv.setText("安装");
+		tv.setTextColor(0xFFFFFFFF);
+		tv.setTextSize(9);
+		tv.setSingleLine(true);
+		tv.setEllipsize(TextUtils.TruncateAt.END);
+		tv.setMaxWidth(dp(72));
+		cell.addView(tv);
+	}
+
+	private void populateGlobalProfileCell(LinearLayout cell) {
+		ImageView iv = new ImageView(requireContext());
+		iv.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
+		try {
+			Drawable icon = ContextCompat.getDrawable(requireContext(), R.drawable.s60_settings);
+			if (icon != null) iv.setImageDrawable(icon);
+		} catch (Exception ignored) {}
+		cell.addView(iv);
+
+		TextView tv = new TextView(requireContext());
+		tv.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		tv.setText("JAR 全局设置");
 		tv.setTextColor(0xFFFFFFFF);
 		tv.setTextSize(9);
 		tv.setSingleLine(true);
@@ -582,14 +606,20 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 		if (focusIndex < 0 || totalGridCells == 0) return false;
 
 		if (focusIndex == 0) {
-			// "安装jar"
-			NokiaLog.i("Box", "onSelect: 安装jar");
+			// 安装
+			NokiaLog.i("Box", "onSelect: 安装");
 			launchFilePicker();
+			return true;
+		}
+		if (focusIndex == 1) {
+			// JAR 全局设置
+			NokiaLog.i("Box", "onSelect: JAR 全局设置");
+			NokiaGlobalProfile.openGlobalSettings(requireContext());
 			return true;
 		}
 
 		// JAR 应用 → 进入次级菜单
-		int appIdx = focusIndex - 1;
+		int appIdx = focusIndex - 2;
 		if (appIdx >= 0 && appIdx < appItems.size()) {
 			AppItem app = appItems.get(appIdx);
 			NokiaLog.i("Box", "onSelect: 进入次级菜单 " + app.getTitle());
