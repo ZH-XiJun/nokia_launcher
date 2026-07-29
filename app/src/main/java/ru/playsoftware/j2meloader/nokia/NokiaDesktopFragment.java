@@ -5,11 +5,14 @@ import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -38,6 +41,14 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 	private int focusIndex = -1;
 	private View selectedView = null;
 	private NokiaSettingsStorage settingsStorage;
+	/** 选中快捷应用图标上方浮出的名称气泡（半透明，短暂显示后自动消失） */
+	private TextView shortcutNameBubble;
+	/** 横向滚动的快捷栏（用于计算气泡水平位置） */
+	private HorizontalScrollView shortcutBar;
+	/** 气泡自动隐藏的定时器 */
+	private Handler bubbleHandler;
+	/** 气泡显示的持续时间（毫秒） */
+	private static final long BUBBLE_DURATION = 2000;
 
 	/** 快捷栏项数（动态） */
 	private int shortcutCount = 0;
@@ -58,6 +69,11 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		super.onViewCreated(view, savedInstanceState);
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.scaleMidContent(view, true);
+
+		// 名称气泡与快捷栏引用
+		shortcutBar = view.findViewById(R.id.shortcutBar);
+		shortcutNameBubble = view.findViewById(R.id.shortcutNameBubble);
+		bubbleHandler = new Handler(Looper.getMainLooper());
 
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 
@@ -97,12 +113,14 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		// 收集通知区焦点目标
 		collectNotifTargets(view);
 
-		// 初始化选中第一个快捷项（如果有）
-		if (shortcutCount > 0) {
-			setFocusIndex(0);
-		} else if (focusTargets.size() > 0) {
-			setFocusIndex(0);
-		}
+		// 初始选中第一个焦点（延迟到布局完成，确保气泡定位坐标准确）
+		view.post(() -> {
+			if (shortcutCount > 0) {
+				setFocusIndex(0);
+			} else if (focusTargets.size() > 0) {
+				setFocusIndex(0);
+			}
+		});
 
 		NokiaLog.i("Desktop", "桌面待机屏初始化完成：快捷栏 " + shortcutCount
 				+ " 项，通知区 " + NOTIF_COUNT + " 项，共 " + focusTargets.size() + " 个焦点");
@@ -428,6 +446,80 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 			v.setBackgroundResource(R.drawable.bg_nokia_selected);
 			selectedView = v;
 		}
+		// 选中项在图标正上方显示名称气泡（仅快捷栏内，其余区域隐藏）
+		if (isInShortcuts() && v != null) {
+			showShortcutBubble(index, v);
+		} else {
+			hideShortcutBubble();
+		}
+	}
+
+	/** 在选中快捷应用图标正上方浮出名称气泡。 */
+	private void showShortcutBubble(int index, View cell) {
+		if (shortcutNameBubble == null || shortcutBar == null) return;
+		if (index < 0 || index >= shortcutApps.size()) return;
+		ShortcutApp app = shortcutApps.get(index);
+		shortcutNameBubble.setText(app.label);
+
+		// 中间内容根（RelativeLayout）宽度，作为气泡最大宽度基准
+		int contentW = (int) (240 * getResources().getDisplayMetrics().density);
+		View parent = (View) shortcutNameBubble.getParent();
+		if (parent != null && parent.getWidth() > 0) {
+			contentW = parent.getWidth();
+		}
+		// 测量气泡尺寸（宽度不超过中间内容宽度，过长则省略）
+		shortcutNameBubble.measure(
+				View.MeasureSpec.makeMeasureSpec(Math.max(0, contentW - 4), View.MeasureSpec.AT_MOST),
+				View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+		int bw = shortcutNameBubble.getMeasuredWidth();
+		int bh = shortcutNameBubble.getMeasuredHeight();
+
+		// 选中图标中心相对中间内容根的坐标（考虑横向滚动偏移）
+		int cx = shortcutBar.getLeft()
+				+ (cell.getLeft() - shortcutBar.getScrollX())
+				+ cell.getWidth() / 2;
+		int left = cx - bw / 2;
+		int maxLeft = contentW - bw - 2;
+		if (left < 2) left = 2;
+		if (left > maxLeft) left = Math.max(2, maxLeft);
+		shortcutNameBubble.setX(left);
+		// 气泡半透明浮在快捷栏图标下方（不遮挡图标），不占用布局空间
+		shortcutNameBubble.setY(shortcutBar.getTop() + shortcutBar.getHeight() + dp(1));
+		shortcutNameBubble.setVisibility(View.VISIBLE);
+		NokiaLog.d("Desktop", "显示快捷栏名称气泡: " + app.label + " @x=" + left);
+
+		// 显示约 2 秒后自动消失
+		bubbleHandler.removeCallbacks(bubbleHideRunnable);
+		bubbleHandler.postDelayed(bubbleHideRunnable, BUBBLE_DURATION);
+	}
+
+	/** 延迟隐藏名称气泡的 Runnable。 */
+	private final Runnable bubbleHideRunnable = new Runnable() {
+		@Override
+		public void run() {
+			hideShortcutBubble();
+		}
+	};
+
+	/** 隐藏名称气泡。 */
+	private void hideShortcutBubble() {
+		if (bubbleHandler != null) {
+			bubbleHandler.removeCallbacks(bubbleHideRunnable);
+		}
+		if (shortcutNameBubble != null) {
+			shortcutNameBubble.setVisibility(View.GONE);
+		}
+	}
+
+	@Override
+	public void onDestroyView() {
+		super.onDestroyView();
+		if (bubbleHandler != null) {
+			bubbleHandler.removeCallbacks(bubbleHideRunnable);
+		}
+		bubbleHandler = null;
+		shortcutNameBubble = null;
+		shortcutBar = null;
 	}
 
 	// ---- 快捷栏点击（触摸）- 已由 cell 的 onClickListener 直接处理 ----
