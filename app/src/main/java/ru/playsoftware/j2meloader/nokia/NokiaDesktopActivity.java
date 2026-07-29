@@ -64,6 +64,11 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		}
 	}
 
+	/** 暴露当前按键绑定实例，供 Fragment 读取（如桌面锁屏按钮展示已绑定键名）。 */
+	public NokiaKeyBinding getKeyBinding() {
+		return keyBinding;
+	}
+
 	// ---- 生命周期 ----
 
 	@Override

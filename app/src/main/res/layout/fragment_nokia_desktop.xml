@@ -137,6 +137,7 @@
                 android:layout_marginEnd="6dp"
                 android:src="@drawable/ic_nokia_lock" />
             <TextView
+                android:id="@+id/notifLockText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="锁屏"

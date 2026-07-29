@@ -126,6 +126,8 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		if (notifLock != null) {
 			notifLock.setOnClickListener(v -> lockScreen());
 		}
+		// 锁屏文案：显示「锁屏：按xxx键」，xxx 为桌面设置里绑定的锁屏键，方便用户记忆
+		refreshLockScreenHint(host);
 
 		// 初始选中第一个焦点（延迟到布局完成，确保气泡定位坐标准确）
 		view.post(() -> {
@@ -145,6 +147,8 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		super.onResume();
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.setBottomBar("功能表", "", "桌面设置");
+		// 从桌面设置改完键返回后，刷新锁屏按钮的键名提示
+		refreshLockScreenHint(host);
 		NokiaLog.d("Desktop", "桌面 onResume 同步底部栏");
 	}
 
@@ -310,6 +314,22 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		if (notifRadio != null) focusTargets.add(notifRadio);
 		if (notifLock != null) focusTargets.add(notifLock);
 		if (notifCalendar != null) focusTargets.add(notifCalendar);
+	}
+
+	/** 刷新通知区「锁屏」按钮文案：显示已绑定的锁屏键名（如「锁屏：按挂机键」）。 */
+	private void refreshLockScreenHint(NokiaDesktopActivity host) {
+		TextView tv = getView() != null ? getView().findViewById(R.id.notifLockText) : null;
+		if (tv == null) return;
+		NokiaKeyBinding kb = host.getKeyBinding();
+		if (kb == null) return;
+		int lockKey = kb.getKeyCode(NokiaKeyBinding.ACTION_LOCK_SCREEN);
+		if (NokiaKeyBinding.isBound(lockKey)) {
+			String tip = "锁屏：按" + NokiaLog.keyName(lockKey) + "键";
+			tv.setText(tip);
+			NokiaLog.i("Desktop", "锁屏按钮文案=" + tip);
+		} else {
+			tv.setText("锁屏");
+		}
 	}
 
 	// ---- NokiaFocusHost 接口 ----

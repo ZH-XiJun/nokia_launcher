@@ -47,11 +47,34 @@ public final class NokiaLog {
 		if (enabled) Log.e(TAG, "[" + sub + "] " + msg, t);
 	}
 
-	/** 兼容 API &lt; 29 的 keyCode 转可读名。 */
+	/** 把 keyCode 转成面向用户的中文键名（日志与 UI 通用）。 */
 	public static String keyName(int keyCode) {
-		if (Build.VERSION.SDK_INT >= 29) {
-			return KeyEvent.keyCodeToString(keyCode);
+		switch (keyCode) {
+			case KeyEvent.KEYCODE_DPAD_UP:      return "上";
+			case KeyEvent.KEYCODE_DPAD_DOWN:    return "下";
+			case KeyEvent.KEYCODE_DPAD_LEFT:    return "左";
+			case KeyEvent.KEYCODE_DPAD_RIGHT:   return "右";
+			case KeyEvent.KEYCODE_DPAD_CENTER:  return "确认";
+			case KeyEvent.KEYCODE_ENTER:        return "确定";
+			case KeyEvent.KEYCODE_SPACE:        return "空格";
+			case KeyEvent.KEYCODE_BUTTON_A:     return "A";
+			case KeyEvent.KEYCODE_SOFT_LEFT:    return "左软键";
+			case KeyEvent.KEYCODE_SOFT_RIGHT:   return "右软键";
+			case KeyEvent.KEYCODE_MENU:         return "菜单";
+			case KeyEvent.KEYCODE_BACK:         return "返回";
+			case KeyEvent.KEYCODE_ENDCALL:      return "挂机";
+			case KeyEvent.KEYCODE_CALL:         return "通话";
+			case KeyEvent.KEYCODE_CAMERA:       return "相机";
+			case KeyEvent.KEYCODE_VOLUME_UP:    return "音量加";
+			case KeyEvent.KEYCODE_VOLUME_DOWN:  return "音量减";
+			case KeyEvent.KEYCODE_POWER:        return "电源";
+			case KeyEvent.KEYCODE_HOME:         return "Home";
+			case KeyEvent.KEYCODE_UNKNOWN:      return "未绑定";
+			default:
+				if (Build.VERSION.SDK_INT >= 29) {
+					return KeyEvent.keyCodeToString(keyCode);
+				}
+				return "KEYCODE_" + keyCode;
 		}
-		return "KEYCODE_" + keyCode;
 	}
 }
