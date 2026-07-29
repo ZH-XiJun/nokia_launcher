@@ -111,13 +111,35 @@
             android:paddingBottom="3dp">
             <ImageView
                 android:layout_width="16dp"
-                android:layout_height="12dp"
+                android:layout_height="16dp"
                 android:layout_marginEnd="6dp"
-                android:src="@drawable/ic_nokia_radio" />
+                android:src="@drawable/ic_nokia_web" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="收音机"
+                android:text="3g.qq.com"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/notifLock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="true"
+            android:clickable="true"
+            android:gravity="center_vertical"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp">
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginEnd="6dp"
+                android:src="@drawable/ic_nokia_lock" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="锁屏"
                 android:textColor="#FFFFFF"
                 android:textSize="11sp" />
         </LinearLayout>

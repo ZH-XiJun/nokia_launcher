@@ -1,5 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
@@ -52,8 +54,8 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 
 	/** 快捷栏项数（动态） */
 	private int shortcutCount = 0;
-	/** 通知区项数（固定 3） */
-	private static final int NOTIF_COUNT = 3;
+	/** 通知区项数（音乐、3g.qq.com、锁屏、日历） */
+	private static final int NOTIF_COUNT = 4;
 	/** 快捷栏第一个焦点索引 */
 	private static final int SHORTCUT_FIRST = 0;
 
@@ -116,6 +118,16 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		buildShortcutBar(view);
 		// 收集通知区焦点目标
 		collectNotifTargets(view);
+
+		// 通知区点击行为：3g.qq.com → 浏览器打开网页；锁屏 → 一键锁屏
+		View notifRadio = view.findViewById(R.id.notifRadio);
+		if (notifRadio != null) {
+			notifRadio.setOnClickListener(v -> openUrl("http://wkypub.top:9999"));
+		}
+		View notifLock = view.findViewById(R.id.notifLock);
+		if (notifLock != null) {
+			notifLock.setOnClickListener(v -> lockScreen());
+		}
 
 		// 初始选中第一个焦点（延迟到布局完成，确保气泡定位坐标准确）
 		view.post(() -> {
@@ -268,15 +280,56 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		}
 	}
 
+	// ---- 通知区点击行为 ----
+
+	/** 用浏览器打开指定网址（交由系统选择器挑选浏览器）。 */
+	private void openUrl(String url) {
+		NokiaLog.i("Desktop", "打开网页: " + url);
+		try {
+			Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			startActivity(intent);
+		} catch (Exception e) {
+			NokiaLog.e("Desktop", "打开网页失败: " + url, e);
+		}
+	}
+
+	/** 一键锁屏。需要设备管理员权限；未授权时跳转系统激活页。 */
+	private void lockScreen() {
+		NokiaLog.i("Desktop", "锁屏请求");
+		Context ctx = requireContext();
+		DevicePolicyManager dpm =
+				(DevicePolicyManager) ctx.getSystemService(Context.DEVICE_POLICY_SERVICE);
+		ComponentName admin = new ComponentName(ctx, NokiaDeviceAdminReceiver.class);
+		if (dpm != null && dpm.isAdminActive(admin)) {
+			NokiaLog.i("Desktop", "设备管理员已激活，执行 lockNow 锁屏");
+			dpm.lockNow();
+		} else {
+			NokiaLog.i("Desktop", "设备管理员未激活，跳转系统激活页");
+			Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+			intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin);
+			intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+					"启用后可通过桌面「锁屏」一键锁屏息屏");
+			try {
+				startActivity(intent);
+			} catch (Exception e) {
+				NokiaLog.e("Desktop", "跳转设备管理员激活页失败", e);
+			}
+		}
+	}
+
 	// ---- 收集通知区焦点 ----
+
 
 	private void collectNotifTargets(View view) {
 		View notifMusic = view.findViewById(R.id.notifMusic);
 		View notifRadio = view.findViewById(R.id.notifRadio);
+		View notifLock = view.findViewById(R.id.notifLock);
 		View notifCalendar = view.findViewById(R.id.notifCalendar);
 
 		if (notifMusic != null) focusTargets.add(notifMusic);
 		if (notifRadio != null) focusTargets.add(notifRadio);
+		if (notifLock != null) focusTargets.add(notifLock);
 		if (notifCalendar != null) focusTargets.add(notifCalendar);
 	}
 

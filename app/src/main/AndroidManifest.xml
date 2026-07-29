@@ -185,6 +185,19 @@
         <receiver
             android:name="com.nokia.mid.ui.NotificationBroadcastReceiver"
             android:process=":midlet" />
+
+        <!-- 设备管理员：仅用于桌面「锁屏」一键锁屏息屏 -->
+        <receiver
+            android:name=".nokia.NokiaDeviceAdminReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
