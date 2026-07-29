@@ -5,11 +5,21 @@
     android:layout_width="240dp"
     android:layout_height="280dp">
 
+    <!-- 快捷栏上方的点线分割线 -->
+    <View
+        android:id="@+id/shortcutDividerTop"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
+        android:background="@drawable/bg_nokia_divider_dashed" />
+
     <HorizontalScrollView
         android:id="@+id/shortcutBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
+        android:layout_below="@id/shortcutDividerTop"
         android:scrollbars="none">
 
         <LinearLayout
@@ -44,7 +54,7 @@
         android:textSize="10sp"
         android:visibility="gone" />
 
-    <!-- 快捷栏与通知区之间的分界线 -->
+    <!-- 快捷栏与通知区之间的点线分割线 -->
     <View
         android:id="@+id/shortcutDivider"
         android:layout_width="match_parent"
@@ -52,7 +62,7 @@
         android:layout_below="@id/shortcutBar"
         android:layout_marginStart="6dp"
         android:layout_marginEnd="6dp"
-        android:background="#40FFFFFF" />
+        android:background="@drawable/bg_nokia_divider_dashed" />
 
     <LinearLayout
         android:id="@+id/notificationArea"

@@ -75,6 +75,16 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		shortcutNameBubble = view.findViewById(R.id.shortcutNameBubble);
 		bubbleHandler = new Handler(Looper.getMainLooper());
 
+		// 上下两条点线分割线（自定义 Drawable，保证在各类 ROM 上都能渲染）
+		View dividerTop = view.findViewById(R.id.shortcutDividerTop);
+		View dividerBottom = view.findViewById(R.id.shortcutDivider);
+		if (dividerTop != null) {
+			dividerTop.setBackground(new NokiaDashedLineDrawable(0x60FFFFFF, 3, 3));
+		}
+		if (dividerBottom != null) {
+			dividerBottom.setBackground(new NokiaDashedLineDrawable(0x60FFFFFF, 3, 3));
+		}
+
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 
 		View wall = host.findViewById(R.id.wallpaper);
