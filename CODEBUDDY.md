@@ -24,7 +24,7 @@
 - 原本的 **`MainActivity`** 是 J2ME-Loader 自带的启动器 / 文件选择器 / 应用列表界面，**它不再是本应用的主界面，也不是开发重点**。它只是作为「百宝箱」里启动 JAR 应用、以及复用其设置入口的底层壳存在。
 - 因此，调试、截图、功能验证时，应当启动 / 操作的是 `NokiaDesktopActivity`，而不是 `MainActivity`。例如：
   ```bash
-  adb shell am start -n ru.playsoftware.j2meloader.debug/ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity
+  adb shell am start -n io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity
   ```
   或直接模拟按 Home 键进入桌面：
   ```bash

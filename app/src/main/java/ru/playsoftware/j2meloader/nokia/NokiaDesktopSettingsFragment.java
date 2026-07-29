@@ -132,15 +132,19 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 			setFocusIndex(0);
 			return true;
 		}
+		int oldIndex = focusIndex;
 		switch (direction) {
 			case NokiaKeyBinding.ACTION_UP:
 				if (focusIndex > 0) setFocusIndex(focusIndex - 1);
+				NokiaLog.d("DesktopSettings", "onDirection 上：old=" + oldIndex + " new=" + focusIndex);
 				return true;
 			case NokiaKeyBinding.ACTION_DOWN:
 				if (focusIndex < count - 1) setFocusIndex(focusIndex + 1);
+				NokiaLog.d("DesktopSettings", "onDirection 下：old=" + oldIndex + " new=" + focusIndex);
 				return true;
 			case NokiaKeyBinding.ACTION_LEFT:
 			case NokiaKeyBinding.ACTION_RIGHT:
+				NokiaLog.d("DesktopSettings", "onDirection 左右：focus=" + focusIndex + " 不响应");
 				return true; // 列表项不响应左右
 			default:
 				return false;
@@ -149,6 +153,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 
 	@Override
 	public boolean onSelect() {
+		NokiaLog.d("DesktopSettings", "onSelect 当前 focusIndex=" + focusIndex);
 		if (focusIndex < 0) return false;
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		switch (focusIndex) {
@@ -172,6 +177,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 				return false;
 		}
 	}
+
 
 	@Override
 	public boolean onSoftLeft() {
@@ -197,7 +203,9 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 		clearFocusBackground();
 		focusIndex = index;
 		applyFocusBackground();
+		NokiaLog.d("DesktopSettings", "setFocusIndex -> " + index + " (" + ITEM_NAMES[index] + ")");
 	}
+
 
 	private void clearFocusBackground() {
 		if (selectedView != null) {

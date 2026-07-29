@@ -54,10 +54,15 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		// 桌面始终竖屏：从横屏游戏返回时必须强制旋转回竖屏，
 		// 否则系统会沿用游戏的横屏方向导致桌面横向显示。
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+		// 从按键绑定设置返回后，重新加载最新绑定，避免 Activity 缓存旧映射。
+		if (keyBinding != null) {
+			keyBinding.reload();
+		}
 		if (statusBarController != null) {
 			statusBarController.start();
 		}
 	}
+
 
 	@Override
 	public void onWindowFocusChanged(boolean hasFocus) {
@@ -112,6 +117,11 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 
 		NokiaLog.d("Desktop", "dispatchKeyEvent 收到按下 " + NokiaLog.keyName(event.getKeyCode()));
 
+		// 每次按键前重新加载绑定，确保从按键绑定设置返回后的修改立即生效
+		if (keyBinding != null) {
+			keyBinding.reload();
+		}
+
 		// 如果是按键绑定设置界面正在录制按键，优先交给它处理（无论该按键是否已绑定）
 		NokiaKeyBindFragment keyBindFrag = findKeyBindFragment();
 		if (keyBindFrag != null && keyBindFrag.isRecording()) {
@@ -121,6 +131,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		}
 
 		int action = keyBinding.resolveAction(event);
+
 		if (action < 0) {
 			// 未绑定的按键：允许系统继续处理（如音量键仍然调整音量）
 			NokiaLog.d("Desktop", "未绑定的按键 " + NokiaLog.keyName(event.getKeyCode())

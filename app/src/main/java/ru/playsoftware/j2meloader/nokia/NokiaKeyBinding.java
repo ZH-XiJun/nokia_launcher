@@ -88,6 +88,25 @@ public class NokiaKeyBinding {
 		}
 	}
 
+	/** 强制从 SharedPreferences 重新加载绑定，仅当发生变化时才打印日志，避免刷屏。 */
+	public void reload() {
+		int[] old = keycodes.clone();
+		load();
+		boolean changed = false;
+		for (int i = 0; i < ACTION_COUNT; i++) {
+			if (old[i] != keycodes[i]) {
+				changed = true;
+				break;
+			}
+		}
+		if (changed) {
+			NokiaLog.i("KeyBinding", "绑定已变更，重新加载：");
+			dumpBindings();
+		}
+	}
+
+
+
 	/** 保存指定动作的按键码。若该键已被其它动作占用，自动解除原绑定，保证一对一。 */
 	public void setKeyCode(int action, int keycode) {
 		if (action < 0 || action >= ACTION_COUNT) {
