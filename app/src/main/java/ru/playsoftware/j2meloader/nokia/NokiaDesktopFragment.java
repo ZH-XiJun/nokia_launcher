@@ -97,20 +97,14 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		}
 		TextView bl = host.findViewById(R.id.bottomLeft);
 		if (bl != null) {
-			bl.setText("功能表");
 			bl.setOnClickListener(v -> host.openMenu());
-		}
-		TextView bc = host.findViewById(R.id.bottomCenter);
-		if (bc != null) {
-			bc.setText("");
-			bc.setVisibility(View.GONE);
-			bc.setOnClickListener(null);
 		}
 		TextView br = host.findViewById(R.id.bottomRight);
 		if (br != null) {
-			br.setText("桌面设置");
 			br.setOnClickListener(v -> host.openDesktopSettings());
 		}
+		// 通过 setBottomBar 统一设置文字与可见性，避免从向导/其它页返回后文字消失
+		host.setBottomBar("功能表", "", "桌面设置");
 
 		// 清空上一轮的焦点状态，避免旧 View 遗留导致导航错乱或崩溃
 		focusTargets.clear();
@@ -134,6 +128,14 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 
 		NokiaLog.i("Desktop", "桌面待机屏初始化完成：快捷栏 " + shortcutCount
 				+ " 项，通知区 " + NOTIF_COUNT + " 项，共 " + focusTargets.size() + " 个焦点");
+	}
+
+	@Override
+	public void onResume() {
+		super.onResume();
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		host.setBottomBar("功能表", "", "桌面设置");
+		NokiaLog.d("Desktop", "桌面 onResume 同步底部栏");
 	}
 
 	// ---- 构建快捷栏 ----

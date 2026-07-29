@@ -22,7 +22,7 @@ import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
  * 列出所有 8 个动作及对应按键，支持方向键导航选中 + 确认键进入录制模式，
  * 按下任意物理键即完成绑定。
  */
-public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost {
+public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, NokiaKeyRecorder {
 
 	private NokiaKeyBinding keyBinding;
 	private View[] itemViews = new View[NokiaKeyBinding.ACTION_COUNT];

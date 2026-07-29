@@ -150,7 +150,6 @@ public final class NokiaGlobalProfile {
 		inject(nkb, NokiaKeyBinding.ACTION_SELECT, Canvas.KEY_FIRE, map);
 		inject(nkb, NokiaKeyBinding.ACTION_SOFT_LEFT, Canvas.KEY_SOFT_LEFT, map);
 		inject(nkb, NokiaKeyBinding.ACTION_SOFT_RIGHT, Canvas.KEY_SOFT_RIGHT, map);
-		// 注：ACTION_BACK 不注入，保留 J2ME 默认 KEYCODE_BACK -> KEY_OPTIONS_MENU
 		return map;
 	}
 

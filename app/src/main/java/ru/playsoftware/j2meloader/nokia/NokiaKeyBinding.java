@@ -6,7 +6,7 @@ import android.view.KeyEvent;
 
 /**
  * 按键绑定存储类。
- * 管理 8 个动作到 Android KeyCode 的映射，持久化在 SharedPreferences 中。
+ * 管理 7 个动作到 Android KeyCode 的映射，持久化在 SharedPreferences 中。
  * 默认值适合大多数安卓设备（方向键、确认键、音量键模拟左右软键）。
  */
 public class NokiaKeyBinding {
@@ -19,16 +19,18 @@ public class NokiaKeyBinding {
 	public static final int ACTION_SELECT = 4;
 	public static final int ACTION_SOFT_LEFT = 5;
 	public static final int ACTION_SOFT_RIGHT = 6;
-	public static final int ACTION_BACK = 7;
 
-	public static final int ACTION_COUNT = 8;
+	public static final int ACTION_COUNT = 7;
 
 	private static final String PREFS_NAME = "nokia_key_bindings";
 
 	private static final String[] PREF_KEYS = {
 			"up", "down", "left", "right",
-			"select", "soft_left", "soft_right", "back"
+			"select", "soft_left", "soft_right"
 	};
+
+	// 首次启动按键绑定向导是否已完成（仅首次启动弹出，清数据后重置）
+	private static final String PREF_WIZARD_DONE = "key_bind_wizard_done";
 
 	// 默认按键码 — 方向键/确认/返回有通用默认值，左右软键默认未绑定（需用户自行绑定）
 	private static final int[] DEFAULT_KEYCODES = {
@@ -39,7 +41,6 @@ public class NokiaKeyBinding {
 			KeyEvent.KEYCODE_DPAD_CENTER,           // select
 			KeyEvent.KEYCODE_SOFT_LEFT,             // soft_left
 			KeyEvent.KEYCODE_SOFT_RIGHT,            // soft_right
-			KeyEvent.KEYCODE_BACK,                  // back
 	};
 
 	public static String getActionName(int action) {
@@ -51,9 +52,30 @@ public class NokiaKeyBinding {
 			case ACTION_SELECT: return "确认";
 			case ACTION_SOFT_LEFT: return "左软键";
 			case ACTION_SOFT_RIGHT: return "右软键";
-			case ACTION_BACK: return "返回";
 			default: return "未知";
 		}
+	}
+
+	/**
+	 * 首次启动向导中使用的"提示按键名"。与 {@link #getActionName} 的区别在于：
+	 * 确认键在向导里提示为"确定"（更贴近用户对 OK 键的称呼）。
+	 */
+	public static String getWizardPromptName(int action) {
+		if (action == ACTION_SELECT) return "确定";
+		return getActionName(action);
+	}
+
+	/** 首次启动向导是否已完成（已完成则不再弹出）。 */
+	public boolean isWizardDone() {
+		boolean done = prefs.getBoolean(PREF_WIZARD_DONE, false);
+		NokiaLog.i("KeyBinding", "isWizardDone=" + done);
+		return done;
+	}
+
+	/** 标记首次启动向导已完成（绑定完成或用户跳过）。 */
+	public void markWizardDone() {
+		prefs.edit().putBoolean(PREF_WIZARD_DONE, true).apply();
+		NokiaLog.i("KeyBinding", "首次启动按键绑定向导已标记为完成");
 	}
 
 	public static boolean isBound(int keycode) {

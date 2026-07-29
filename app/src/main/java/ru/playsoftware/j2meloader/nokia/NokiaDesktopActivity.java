@@ -41,8 +41,23 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		// 确保全局 JAR 设置 profile 存在并设为默认
 		NokiaGlobalProfile.ensureGlobalProfile(this);
 
-		if (getSupportFragmentManager().findFragmentById(R.id.midPanel) == null) {
-			loadDesktopFragment();
+		// 首次启动：若按键绑定向导未完成，则进入向导（清数据后 isWizardDone 复位会再次弹出）
+		Fragment existing = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+		if (existing == null) {
+			if (!keyBinding.isWizardDone()) {
+				NokiaLog.i("Desktop", "首次启动：进入按键绑定向导");
+				loadWizardFragment();
+			} else {
+				loadDesktopFragment();
+			}
+		}
+	}
+
+	/** 重新从 SharedPreferences 加载按键绑定到内存（向导/绑定界面完成后调用，确保立即生效）。 */
+	public void reloadKeyBindings() {
+		if (keyBinding != null) {
+			keyBinding.reload();
+			NokiaLog.i("Desktop", "reloadKeyBindings 完成");
 		}
 	}
 
@@ -122,17 +137,29 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 			keyBinding.reload();
 		}
 
-		// 如果是按键绑定设置界面正在录制按键，优先交给它处理（无论该按键是否已绑定）
-		NokiaKeyBindFragment keyBindFrag = findKeyBindFragment();
-		if (keyBindFrag != null && keyBindFrag.isRecording()) {
-			NokiaLog.i("Desktop", "录制模式捕获按键 " + NokiaLog.keyName(event.getKeyCode()));
-			keyBindFrag.onKeyRecorded(event.getKeyCode());
+		// 如果当前 Fragment 处于录制态（按键绑定设置 / 首次启动向导），
+		// 优先把任意物理键直接喂给它捕获，再走 resolveAction 分发。
+		Fragment curForRec = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+		if (curForRec instanceof NokiaKeyRecorder
+				&& ((NokiaKeyRecorder) curForRec).isRecording()) {
+			NokiaLog.i("Desktop", "录制态捕获按键 " + NokiaLog.keyName(event.getKeyCode()));
+			((NokiaKeyRecorder) curForRec).onKeyRecorded(event.getKeyCode());
 			return true;
 		}
 
 		int action = keyBinding.resolveAction(event);
 
 		if (action < 0) {
+			// 返回键未绑定时兜底为导航返回（非桌面 Fragment），否则交给系统。
+			if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+				Fragment backHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+				if (backHost instanceof NokiaFocusHost
+						&& !(backHost instanceof NokiaDesktopFragment)) {
+					NokiaLog.d("Desktop", "未绑定返回键 -> host.onBack()");
+					((NokiaFocusHost) backHost).onBack();
+					return true;
+				}
+			}
 			// 未绑定的按键：允许系统继续处理（如音量键仍然调整音量）
 			NokiaLog.d("Desktop", "未绑定的按键 " + NokiaLog.keyName(event.getKeyCode())
 					+ "，交给系统处理");
@@ -166,16 +193,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 				case NokiaKeyBinding.ACTION_SOFT_RIGHT:
 					handled = host.onSoftRight();
 					break;
-				case NokiaKeyBinding.ACTION_BACK:
-					handled = host.onBack();
-					break;
 			}
-		}
-
-		// 如果当前 Fragment 是桌面，BACK 键不处理（交给系统返回桌面）
-		if (action == NokiaKeyBinding.ACTION_BACK && current instanceof NokiaDesktopFragment) {
-			NokiaLog.d("Desktop", "桌面 BACK 键，交给系统返回桌面");
-			return super.dispatchKeyEvent(event);
 		}
 
 		if (handled) {
@@ -220,13 +238,11 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		return super.dispatchKeyEvent(event);
 	}
 
-	/** 查找当前是否打开了按键绑定设置界面。 */
-	private NokiaKeyBindFragment findKeyBindFragment() {
-		Fragment f = getSupportFragmentManager().findFragmentById(R.id.midPanel);
-		if (f instanceof NokiaKeyBindFragment) {
-			return (NokiaKeyBindFragment) f;
-		}
-		return null;
+	private void loadWizardFragment() {
+		NokiaLog.i("Desktop", "加载首次启动按键绑定向导 Fragment");
+		getSupportFragmentManager().beginTransaction()
+				.replace(R.id.midPanel, new NokiaKeyBindWizardFragment())
+				.commit();
 	}
 
 	// ---- 导航方法 ----
