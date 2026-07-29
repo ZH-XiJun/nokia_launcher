@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.KeyEvent;
@@ -50,8 +51,24 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	@Override
 	protected void onResume() {
 		super.onResume();
+		// 桌面始终竖屏：从横屏游戏返回时必须强制旋转回竖屏，
+		// 否则系统会沿用游戏的横屏方向导致桌面横向显示。
+		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 		if (statusBarController != null) {
 			statusBarController.start();
+		}
+	}
+
+	@Override
+	public void onWindowFocusChanged(boolean hasFocus) {
+		super.onWindowFocusChanged(hasFocus);
+		if (hasFocus) {
+			// onResume 时窗口尚未完全就绪，部分 ROM 会忽略 setRequestedOrientation，
+			// 改用窗口获得焦点的时机再次强制竖屏，作为可靠兜底。
+			int cur = getResources().getConfiguration().orientation;
+			NokiaLog.i("Desktop", "onWindowFocusChanged hasFocus=true, 当前方向="
+					+ (cur == android.content.res.Configuration.ORIENTATION_LANDSCAPE ? "LANDSCAPE" : "PORTRAIT"));
+			setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 		}
 	}
 
