@@ -60,6 +60,13 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		recordStatusBar = view.findViewById(R.id.recordStatusBar);
 		recordStatusText = view.findViewById(R.id.recordStatusText);
 
+		// 录制状态栏触摸点击 = 取消当前录制（仅触摸触发跳过，返回键在录制态被忽略）
+		recordStatusBar.setClickable(true);
+		recordStatusBar.setOnClickListener(v -> {
+			NokiaLog.i("KeyBind", "触摸点击录制状态栏 -> 取消录制");
+			onSkipCurrent();
+		});
+
 		// 壁纸设为桌面深蓝渐变，与诺基亚桌面画风一致
 		View wall = host.findViewById(R.id.wallpaper);
 		if (wall != null) {
@@ -190,7 +197,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		recording = true;
 		recordingAction = action;
 		recordStatusBar.setVisibility(View.VISIBLE);
-		recordStatusText.setText("正在录制: " + NokiaKeyBinding.getActionName(action) + " — 请按下目标按键...");
+		recordStatusText.setText("正在录制: " + NokiaKeyBinding.getActionName(action) + " — 请按目标键（点此处取消）");
 		NokiaLog.i("KeyBind", "开始录制 action=" + NokiaKeyBinding.getActionName(action)
 				+ "，等待物理按键...");
 	}
@@ -215,6 +222,18 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 			return;
 		}
 		applyBinding(action, keycode);
+	}
+
+	/** 录制态下按返回键：跳过当前动作的绑定（保留默认值），退出录制模式。 */
+	@Override
+	public void onSkipCurrent() {
+		if (!recording) return;
+		int action = recordingAction;
+		recording = false;
+		recordingAction = -1;
+		recordStatusBar.setVisibility(View.GONE);
+		NokiaLog.i("KeyBind", "跳过录制 action=" + NokiaKeyBinding.getActionName(action)
+				+ "（保留默认 " + NokiaLog.keyName(keyBinding.getKeyCode(action)) + "）");
 	}
 
 	/** 应用绑定并刷新列表。 */

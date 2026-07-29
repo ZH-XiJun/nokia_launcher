@@ -16,4 +16,11 @@ public interface NokiaKeyRecorder {
 
 	/** 录制态下捕获到一次物理按键时回调。 */
 	void onKeyRecorded(int keycode);
+
+	/**
+	 * 跳过当前动作的绑定（保留默认值），由实现自行前进到下一项或结束。
+	 * 仅通过屏幕上的触摸按钮触发（如向导的"跳过此项"、设置页录制状态栏点击）；
+	 * 录制态下物理返回键会被 Activity 忽略，不会调用本方法，避免误绑/误用。
+	 */
+	void onSkipCurrent();
 }

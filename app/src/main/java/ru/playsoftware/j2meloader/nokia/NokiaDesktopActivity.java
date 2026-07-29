@@ -145,8 +145,13 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		Fragment curForRec = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 		if (curForRec instanceof NokiaKeyRecorder
 				&& ((NokiaKeyRecorder) curForRec).isRecording()) {
-			NokiaLog.i("Desktop", "录制态捕获按键 " + NokiaLog.keyName(event.getKeyCode()));
-			((NokiaKeyRecorder) curForRec).onKeyRecorded(event.getKeyCode());
+			NokiaKeyRecorder rec = (NokiaKeyRecorder) curForRec;
+			int kc = event.getKeyCode();
+			// 录制态下：用户按下的任意物理键（含返回键）都照常录成当前动作的绑定，
+			// 不做任何忽略。\"跳过\"只通过屏幕上的触摸按钮触发（onSkipCurrent），
+			// 不会在这里用返回键实现。
+			NokiaLog.i("Desktop", "录制态捕获按键 " + NokiaLog.keyName(kc));
+			rec.onKeyRecorded(kc);
 			return true;
 		}
 

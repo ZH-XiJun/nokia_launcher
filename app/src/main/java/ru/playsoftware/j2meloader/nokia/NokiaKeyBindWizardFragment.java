@@ -18,8 +18,11 @@ import ru.playsoftware.j2meloader.R;
 /**
  * 首次启动按键绑定向导。
  * <p>
- * 状态机：INTRO（弹窗询问是否绑定）→ RECORDING（按 上/下/左/右/确认/左软键/右软键/返回
+ * 状态机：INTRO（弹窗询问是否绑定）→ RECORDING（按 上/下/左/右/确认/左软键/右软键/锁屏
  * 顺序逐个提示并捕获一次物理键）→ DONE（标记完成并返回桌面）。
+ * <p>
+ * 每个录制步骤支持"跳过"：录制态下按返回键即跳过当前动作（保留默认值）并前进，
+ * 避免设备缺键时卡死。
  * <p>
  * 仅首次启动弹出（由 NokiaKeyBinding.isWizardDone 控制，清数据后重置）。
  * 整个流程完全由物理按键驱动，复用 NokiaKeyRecorder 的录制捕获机制。
@@ -79,6 +82,15 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 		recordPrompt = view.findViewById(R.id.recordPrompt);
 		recordProgress = view.findViewById(R.id.recordProgress);
 		stepBadge = view.findViewById(R.id.stepBadge);
+
+		// 触摸跳过按钮：仅通过触摸触发跳过当前项（录制态下返回键已被忽略，不再用于跳过）
+		View recordSkip = view.findViewById(R.id.recordSkip);
+		if (recordSkip != null) {
+			recordSkip.setOnClickListener(v -> {
+				NokiaLog.i("KeyWizard", "触摸点击 跳过当前项");
+				onSkipCurrent();
+			});
+		}
 
 		// 触摸支持（不影响按键路径）
 		introBind.setOnClickListener(v -> {
@@ -159,6 +171,25 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 			recordingStep = next;
 			updateRecordingPrompt();
 			NokiaLog.i("KeyWizard", "进入第 " + (next + 1) + " 项="
+					+ NokiaKeyBinding.getWizardPromptName(next));
+		}
+	}
+
+	/** 录制态下按返回键：跳过当前动作的绑定（保留默认值），前进到下一项或结束。 */
+	@Override
+	public void onSkipCurrent() {
+		if (state != STATE_RECORDING) return;
+		int action = recordingStep;
+		NokiaLog.i("KeyWizard", "第 " + (action + 1) + " 项 跳过（保留默认 "
+				+ NokiaLog.keyName(keyBinding.getKeyCode(action)) + "）");
+
+		int next = action + 1;
+		if (next >= NokiaKeyBinding.ACTION_COUNT) {
+			finishWizard(true);
+		} else {
+			recordingStep = next;
+			updateRecordingPrompt();
+			NokiaLog.i("KeyWizard", "跳过进入第 " + (next + 1) + " 项="
 					+ NokiaKeyBinding.getWizardPromptName(next));
 		}
 	}
