@@ -416,9 +416,6 @@ public class StatusBarController {
 		simCarrierContainer.setVisibility(View.VISIBLE);
 
 		boolean airplane = isAirplaneModeOn();
-		boolean noAnyCard = (probeTm1 == null && probeTm2 == null
-				&& listener1.getLevel() <= 0 && listener2.getLevel() <= 0);
-
 		if (airplane) {
 			// 飞行模式：两卡槽位都标「飞行模式」
 			setCarrierOrFallback(tvCarrier1, null, "飞行模式");
@@ -426,13 +423,16 @@ public class StatusBarController {
 			return;
 		}
 
-		if (noAnyCard) {
-			// 未检测到任何 SIM
-			setCarrierOrFallback(tvCarrier1, null, "无 SIM");
-			setCarrierOrFallback(tvCarrier2, null, "");
-		} else {
-			setCarrierOrFallback(tvCarrier1, probeTm1, "");
-			setCarrierOrFallback(tvCarrier2, probeTm2, "");
+		// 每个卡槽独立判断：该卡槽无 SIM（或未就绪）显示「无SIM」，有卡则显示运营商名。
+		// 仅当设备确为双卡时，第二卡槽才参与显示，避免单卡设备出现幽灵「无SIM」。
+		boolean dual = getPhoneCount() >= 2;
+		Log.d(TAG, "updateCarriers dual=" + dual
+				+ " probeTm1=" + (probeTm1 != null) + " probeTm2=" + (probeTm2 != null));
+		updateCarrierSlot(tvCarrier1, probeTm1);
+		if (dual) {
+			updateCarrierSlot(tvCarrier2, probeTm2);
+		} else if (tvCarrier2 != null) {
+			tvCarrier2.setText("");
 		}
 	}
 
@@ -447,6 +447,45 @@ public class StatusBarController {
 			}
 		}
 		tv.setText((name == null || name.isEmpty()) ? fallback : name);
+	}
+
+	/** 单个卡槽的运营商显示：无 SIM/未就绪 → 「无SIM」，有卡则优先网络名再回退 SPN。 */
+	@SuppressLint("MissingPermission")
+	private void updateCarrierSlot(TextView tv, TelephonyManager tm) {
+		if (tv == null) return;
+		// 未检测到该卡槽的 TM，或 SIM 未就绪（无卡/未识别）→ 显示「无SIM」
+		int simState = TelephonyManager.SIM_STATE_UNKNOWN;
+		if (tm != null) {
+			try {
+				simState = tm.getSimState();
+			} catch (Exception e) {
+				Log.w(TAG, "updateCarrierSlot getSimState failed", e);
+			}
+		}
+		if (tm == null || simState != TelephonyManager.SIM_STATE_READY) {
+			Log.d(TAG, "updateCarrierSlot: 无 SIM（tm=" + (tm != null) + " state=" + simState + "）");
+			tv.setText("无SIM");
+			return;
+		}
+		String name = tm.getNetworkOperatorName();
+		if (name == null || name.isEmpty()) {
+			name = tm.getSimOperatorName();
+		}
+		Log.d(TAG, "updateCarrierSlot: 运营商=" + (name == null ? "" : name));
+		tv.setText((name == null || name.isEmpty()) ? "" : name);
+	}
+
+	/** 读取设备 SIM 卡槽数量（用于决定是否显示第二卡槽）。 */
+	@SuppressLint("MissingPermission")
+	private int getPhoneCount() {
+		try {
+			if (Build.VERSION.SDK_INT >= 23 && telephonyManager != null) {
+				return telephonyManager.getPhoneCount();
+			}
+		} catch (Exception e) {
+			Log.w(TAG, "getPhoneCount failed", e);
+		}
+		return 1;
 	}
 
 	// ── 电量 ──
