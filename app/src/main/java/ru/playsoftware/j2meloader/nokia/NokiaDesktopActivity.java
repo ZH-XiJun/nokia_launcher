@@ -35,6 +35,9 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		setupNokiaUi();
 		findViewById(R.id.midPanel).setVisibility(View.VISIBLE);
 
+		// 底部软键触摸点击：等效于对应物理软键（修复「桌面设置」等页触摸返回无效）
+		bindBottomBarTouch();
+
 		statusBarController = new StatusBarController(this);
 		keyBinding = new NokiaKeyBinding(this);
 
@@ -169,73 +172,128 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		NokiaLog.d("Desktop", "解析动作 " + NokiaKeyBinding.getActionName(action)
 				+ "(" + action + ")");
 
-		// 获取当前中间面板的 Fragment
-		Fragment current = getSupportFragmentManager().findFragmentById(R.id.midPanel);
-		NokiaLog.d("Desktop", "当前中间面板 Fragment="
-				+ (current != null ? current.getClass().getSimpleName() : "null"));
-		boolean handled = false;
-
-		if (current instanceof NokiaFocusHost) {
-			NokiaFocusHost host = (NokiaFocusHost) current;
-			switch (action) {
-				case NokiaKeyBinding.ACTION_UP:
-				case NokiaKeyBinding.ACTION_DOWN:
-				case NokiaKeyBinding.ACTION_LEFT:
-				case NokiaKeyBinding.ACTION_RIGHT:
-					handled = host.onDirection(action);
-					break;
-				case NokiaKeyBinding.ACTION_SELECT:
-					handled = host.onSelect();
-					break;
-				case NokiaKeyBinding.ACTION_SOFT_LEFT:
-					handled = host.onSoftLeft();
-					break;
-				case NokiaKeyBinding.ACTION_SOFT_RIGHT:
-					handled = host.onSoftRight();
-					break;
+		// 锁屏动作：仅在桌面待机屏生效，按下所绑定的按键（默认挂机键 ENDCALL）即锁屏。
+		// 挂机键在无通话时通常能送达前台 Activity；若某些 ROM 拦截，可用其它按键重新绑定。
+		if (action == NokiaKeyBinding.ACTION_LOCK_SCREEN) {
+			Fragment lockHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+			if (lockHost instanceof NokiaDesktopFragment) {
+				NokiaLog.i("Desktop", "锁屏动作触发（桌面）：执行锁屏");
+				lockScreen();
+				return true;
 			}
+			NokiaLog.d("Desktop", "锁屏动作当前非桌面，交由系统处理");
+			return super.dispatchKeyEvent(event);
 		}
 
-		if (handled) {
+		// 底部软键按下视觉反馈（触摸点击不经过此处，由底部栏点击监听处理）
+		flashBottomBar(action);
+
+		// 将动作分发给当前中间面板 Fragment；被消费则拦截
+		if (dispatchActionToHost(action)) {
 			NokiaLog.d("Desktop", "动作 " + NokiaKeyBinding.getActionName(action)
 					+ " 已被当前 Fragment 消费");
 			return true;
 		}
 
-		// 处理底部软键点击视觉效果
-		switch (action) {
-			case NokiaKeyBinding.ACTION_SOFT_LEFT: {
-				NokiaLog.d("Desktop", "软键视觉：左软键按下");
-				View bl = findViewById(R.id.bottomLeft);
-				if (bl != null) {
-					bl.setPressed(true);
-					bl.postDelayed(() -> bl.setPressed(false), 100);
-				}
-				break;
-			}
-			case NokiaKeyBinding.ACTION_SOFT_RIGHT: {
-				NokiaLog.d("Desktop", "软键视觉：右软键按下");
-				View br = findViewById(R.id.bottomRight);
-				if (br != null) {
-					br.setPressed(true);
-					br.postDelayed(() -> br.setPressed(false), 100);
-				}
-				break;
-			}
-			case NokiaKeyBinding.ACTION_SELECT: {
-				NokiaLog.d("Desktop", "软键视觉：确认键按下");
-				View bc = findViewById(R.id.bottomCenter);
-				if (bc != null) {
-					bc.setPressed(true);
-					bc.postDelayed(() -> bc.setPressed(false), 100);
-				}
-				break;
-			}
-		}
-
 		NokiaLog.d("Desktop", "dispatchKeyEvent 未消费 " + NokiaLog.keyName(event.getKeyCode())
 				+ "，交给系统");
 		return super.dispatchKeyEvent(event);
+	}
+
+	/**
+	 * 把动作分发给当前中间面板 Fragment（NokiaFocusHost）。
+	 * 物理按键与底部软键触摸点击共用此入口，保证两套交互行为一致。
+	 *
+	 * @return 是否被 Fragment 消费
+	 */
+	private boolean dispatchActionToHost(int action) {
+		Fragment current = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+		if (!(current instanceof NokiaFocusHost)) {
+			NokiaLog.d("Desktop", "dispatchActionToHost: 当前非 FocusHost，忽略 action="
+					+ NokiaKeyBinding.getActionName(action));
+			return false;
+		}
+		NokiaFocusHost host = (NokiaFocusHost) current;
+		boolean handled;
+		switch (action) {
+			case NokiaKeyBinding.ACTION_UP:
+			case NokiaKeyBinding.ACTION_DOWN:
+			case NokiaKeyBinding.ACTION_LEFT:
+			case NokiaKeyBinding.ACTION_RIGHT:
+				handled = host.onDirection(action);
+				break;
+			case NokiaKeyBinding.ACTION_SELECT:
+				handled = host.onSelect();
+				break;
+			case NokiaKeyBinding.ACTION_SOFT_LEFT:
+				handled = host.onSoftLeft();
+				break;
+			case NokiaKeyBinding.ACTION_SOFT_RIGHT:
+				handled = host.onSoftRight();
+				break;
+			default:
+				handled = false;
+		}
+		NokiaLog.d("Desktop", "dispatchActionToHost action="
+				+ NokiaKeyBinding.getActionName(action) + " handled=" + handled);
+		return handled;
+	}
+
+	/** 底部软键按下时的视觉反馈（左/确认/右软键），触摸与物理按键共用。 */
+	private void flashBottomBar(int action) {
+		int id = -1;
+		switch (action) {
+			case NokiaKeyBinding.ACTION_SOFT_LEFT:
+				id = R.id.bottomLeft;
+				break;
+			case NokiaKeyBinding.ACTION_SOFT_RIGHT:
+				id = R.id.bottomRight;
+				break;
+			case NokiaKeyBinding.ACTION_SELECT:
+				id = R.id.bottomCenter;
+				break;
+			default:
+				break;
+		}
+		if (id <= 0) return;
+		View v = findViewById(id);
+		if (v != null) {
+			v.setPressed(true);
+			v.postDelayed(() -> v.setPressed(false), 100);
+		}
+	}
+
+	/** 为底部三个软键绑定触摸点击：点击等效于对应物理软键（左/确认/右）。 */
+	private void bindBottomBarTouch() {
+		View left = findViewById(R.id.bottomLeft);
+		View center = findViewById(R.id.bottomCenter);
+		View right = findViewById(R.id.bottomRight);
+		if (left != null) {
+			left.setOnClickListener(v -> {
+				NokiaLog.i("Desktop", "触摸点击 -> 左软键");
+				flashBottomBar(NokiaKeyBinding.ACTION_SOFT_LEFT);
+				dispatchActionToHost(NokiaKeyBinding.ACTION_SOFT_LEFT);
+			});
+		}
+		if (center != null) {
+			center.setOnClickListener(v -> {
+				NokiaLog.i("Desktop", "触摸点击 -> 确认键");
+				flashBottomBar(NokiaKeyBinding.ACTION_SELECT);
+				dispatchActionToHost(NokiaKeyBinding.ACTION_SELECT);
+			});
+		}
+		if (right != null) {
+			right.setOnClickListener(v -> {
+				NokiaLog.i("Desktop", "触摸点击 -> 右软键");
+				flashBottomBar(NokiaKeyBinding.ACTION_SOFT_RIGHT);
+				dispatchActionToHost(NokiaKeyBinding.ACTION_SOFT_RIGHT);
+			});
+		}
+	}
+
+	/** 一键锁屏（委托给 NokiaLockScreen 工具类）。 */
+	private void lockScreen() {
+		NokiaLockScreen.lock(this);
 	}
 
 	private void loadWizardFragment() {

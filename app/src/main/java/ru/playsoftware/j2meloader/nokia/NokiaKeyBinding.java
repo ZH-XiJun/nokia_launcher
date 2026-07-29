@@ -19,14 +19,15 @@ public class NokiaKeyBinding {
 	public static final int ACTION_SELECT = 4;
 	public static final int ACTION_SOFT_LEFT = 5;
 	public static final int ACTION_SOFT_RIGHT = 6;
+	public static final int ACTION_LOCK_SCREEN = 7;
 
-	public static final int ACTION_COUNT = 7;
+	public static final int ACTION_COUNT = 8;
 
 	private static final String PREFS_NAME = "nokia_key_bindings";
 
 	private static final String[] PREF_KEYS = {
 			"up", "down", "left", "right",
-			"select", "soft_left", "soft_right"
+			"select", "soft_left", "soft_right", "lock_screen"
 	};
 
 	// 首次启动按键绑定向导是否已完成（仅首次启动弹出，清数据后重置）
@@ -41,6 +42,7 @@ public class NokiaKeyBinding {
 			KeyEvent.KEYCODE_DPAD_CENTER,           // select
 			KeyEvent.KEYCODE_SOFT_LEFT,             // soft_left
 			KeyEvent.KEYCODE_SOFT_RIGHT,            // soft_right
+			KeyEvent.KEYCODE_ENDCALL,               // lock_screen（默认挂机键）
 	};
 
 	public static String getActionName(int action) {
@@ -52,6 +54,7 @@ public class NokiaKeyBinding {
 			case ACTION_SELECT: return "确认";
 			case ACTION_SOFT_LEFT: return "左软键";
 			case ACTION_SOFT_RIGHT: return "右软键";
+			case ACTION_LOCK_SCREEN: return "锁屏";
 			default: return "未知";
 		}
 	}

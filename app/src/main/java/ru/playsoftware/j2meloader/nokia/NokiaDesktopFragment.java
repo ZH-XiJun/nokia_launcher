@@ -1,7 +1,5 @@
 package ru.playsoftware.j2meloader.nokia;
 
-import android.app.admin.DevicePolicyManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
@@ -296,26 +294,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 
 	/** 一键锁屏。需要设备管理员权限；未授权时跳转系统激活页。 */
 	private void lockScreen() {
-		NokiaLog.i("Desktop", "锁屏请求");
-		Context ctx = requireContext();
-		DevicePolicyManager dpm =
-				(DevicePolicyManager) ctx.getSystemService(Context.DEVICE_POLICY_SERVICE);
-		ComponentName admin = new ComponentName(ctx, NokiaDeviceAdminReceiver.class);
-		if (dpm != null && dpm.isAdminActive(admin)) {
-			NokiaLog.i("Desktop", "设备管理员已激活，执行 lockNow 锁屏");
-			dpm.lockNow();
-		} else {
-			NokiaLog.i("Desktop", "设备管理员未激活，跳转系统激活页");
-			Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
-			intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin);
-			intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-					"启用后可通过桌面「锁屏」一键锁屏息屏");
-			try {
-				startActivity(intent);
-			} catch (Exception e) {
-				NokiaLog.e("Desktop", "跳转设备管理员激活页失败", e);
-			}
-		}
+		NokiaLockScreen.lock(requireContext());
 	}
 
 	// ---- 收集通知区焦点 ----
