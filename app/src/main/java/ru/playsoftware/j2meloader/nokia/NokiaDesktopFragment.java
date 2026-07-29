@@ -316,7 +316,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		if (notifCalendar != null) focusTargets.add(notifCalendar);
 	}
 
-	/** 刷新通知区「锁屏」按钮文案：显示已绑定的锁屏键名（如「锁屏：按挂机键」）。 */
+	/** 刷新通知区「锁屏」按钮文案：显示已绑定的锁屏键名（如「按*号键锁屏」）。 */
 	private void refreshLockScreenHint(NokiaDesktopActivity host) {
 		TextView tv = getView() != null ? getView().findViewById(R.id.notifLockText) : null;
 		if (tv == null) return;
@@ -324,7 +324,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		if (kb == null) return;
 		int lockKey = kb.getKeyCode(NokiaKeyBinding.ACTION_LOCK_SCREEN);
 		if (NokiaKeyBinding.isBound(lockKey)) {
-			String tip = "锁屏：按" + NokiaLog.keyName(lockKey) + "键";
+			String tip = "按" + NokiaLog.keyName(lockKey) + "键锁屏";
 			tv.setText(tip);
 			NokiaLog.i("Desktop", "锁屏按钮文案=" + tip);
 		} else {

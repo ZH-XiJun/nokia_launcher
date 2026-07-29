@@ -69,6 +69,20 @@ public final class NokiaLog {
 			case KeyEvent.KEYCODE_VOLUME_DOWN:  return "音量减";
 			case KeyEvent.KEYCODE_POWER:        return "电源";
 			case KeyEvent.KEYCODE_HOME:         return "Home";
+			case KeyEvent.KEYCODE_STAR:         return "*号";
+			case KeyEvent.KEYCODE_POUND:        return "井号";
+			case KeyEvent.KEYCODE_DEL:          return "删除";
+			case KeyEvent.KEYCODE_CLEAR:        return "清除";
+			case KeyEvent.KEYCODE_0:            return "0";
+			case KeyEvent.KEYCODE_1:            return "1";
+			case KeyEvent.KEYCODE_2:            return "2";
+			case KeyEvent.KEYCODE_3:            return "3";
+			case KeyEvent.KEYCODE_4:            return "4";
+			case KeyEvent.KEYCODE_5:            return "5";
+			case KeyEvent.KEYCODE_6:            return "6";
+			case KeyEvent.KEYCODE_7:            return "7";
+			case KeyEvent.KEYCODE_8:            return "8";
+			case KeyEvent.KEYCODE_9:            return "9";
 			case KeyEvent.KEYCODE_UNKNOWN:      return "未绑定";
 			default:
 				if (Build.VERSION.SDK_INT >= 29) {
