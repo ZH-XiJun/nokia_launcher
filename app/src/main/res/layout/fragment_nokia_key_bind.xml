@@ -4,7 +4,7 @@
     android:layout_width="240dp"
     android:layout_height="280dp"
     android:orientation="vertical"
-    android:background="#F0F0F0">
+    android:background="@drawable/bg_nokia_menu">
 
     <!-- 标题行 -->
     <LinearLayout
@@ -21,7 +21,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="按键绑定设置"
-            android:textColor="#333333"
+            android:textColor="#FFFFFF"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -30,7 +30,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="← 方向键选择, 确认键进入录制"
-            android:textColor="#666666"
+            android:textColor="#9fb3d1"
             android:textSize="8sp" />
     </LinearLayout>
 
@@ -38,7 +38,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#CCCCCC" />
+        android:background="#2a4a7a" />
 
     <!-- 可滚动的绑定列表 -->
     <ScrollView
@@ -80,7 +80,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text=""
-            android:textColor="#2196F3"
+            android:textColor="#64b5f6"
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>

@@ -60,10 +60,10 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		recordStatusBar = view.findViewById(R.id.recordStatusBar);
 		recordStatusText = view.findViewById(R.id.recordStatusText);
 
-		// 壁纸设为浅灰
+		// 壁纸设为桌面深蓝渐变，与诺基亚桌面画风一致
 		View wall = host.findViewById(R.id.wallpaper);
 		if (wall != null) {
-			wall.setBackgroundColor(0xFFF0F0F0);
+			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
 
 		// 标题
@@ -99,7 +99,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 			View row = createRow(i);
 			// 分隔线（每个 row 下方）
 			View divider = new View(requireContext());
-			divider.setBackgroundColor(0xFFDDDDDD);
+			divider.setBackgroundColor(0xFF2a4a7a);
 			LinearLayout.LayoutParams lpDiv = new LinearLayout.LayoutParams(
 					LinearLayout.LayoutParams.MATCH_PARENT, 1);
 			lpDiv.leftMargin = 12;
@@ -121,7 +121,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		// 左侧：动作名
 		TextView tvAction = new TextView(requireContext());
 		tvAction.setText(NokiaKeyBinding.getActionName(action));
-		tvAction.setTextColor(0xFF333333);
+		tvAction.setTextColor(0xFFFFFFFF);
 		tvAction.setTextSize(11);
 		LinearLayout.LayoutParams lpAction = new LinearLayout.LayoutParams(
 				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -132,10 +132,10 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		int kc = keyBinding.getKeyCode(action);
 		if (NokiaKeyBinding.isBound(kc)) {
 			tvKey.setText(keyCodeToString(kc));
-			tvKey.setTextColor(0xFF666666);
+			tvKey.setTextColor(0xFF9fb3d1);
 		} else {
 			tvKey.setText("未绑定");
-			tvKey.setTextColor(0xFFCC0000);
+			tvKey.setTextColor(0xFFFF8A80);
 		}
 		tvKey.setTextSize(10);
 		row.addView(tvKey);
@@ -143,7 +143,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		// 录制提示箭头
 		TextView tvHint = new TextView(requireContext());
 		tvHint.setText(" >");
-		tvHint.setTextColor(0xFF999999);
+		tvHint.setTextColor(0xFF9fb3d1);
 		tvHint.setTextSize(11);
 		row.addView(tvHint);
 
@@ -386,7 +386,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		focusIndex = index;
 		// 设置新焦点
 		if (itemViews[focusIndex] != null) {
-			itemViews[focusIndex].setBackgroundColor(0x550055FF);
+			itemViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
 			scrollToItem(focusIndex);
 		}
 	}

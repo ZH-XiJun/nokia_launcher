@@ -30,8 +30,6 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 	private static final int STATE_RECORDING = 1;
 	private static final int STATE_DONE = 2;
 
-	private static final int HIGHLIGHT = 0x550055FF;
-
 	private NokiaKeyBinding keyBinding;
 	private int state = STATE_INTRO;
 	private int introChoice = 0;      // 0=绑定, 1=跳过
@@ -61,10 +59,10 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 
 		keyBinding = new NokiaKeyBinding(requireContext());
 
-		// 壁纸设为浅灰
+		// 壁纸设为桌面深蓝渐变，与诺基亚桌面画风一致
 		View wall = host.findViewById(R.id.wallpaper);
 		if (wall != null) {
-			wall.setBackgroundColor(0xFFF0F0F0);
+			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
 
 		// 顶部标题
@@ -110,8 +108,8 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 	}
 
 	private void updateIntroHighlight() {
-		introBind.setBackgroundColor(introChoice == 0 ? HIGHLIGHT : 0);
-		introSkip.setBackgroundColor(introChoice == 1 ? HIGHLIGHT : 0);
+		introBind.setBackgroundResource(introChoice == 0 ? R.drawable.bg_nokia_selected_dark : 0);
+		introSkip.setBackgroundResource(introChoice == 1 ? R.drawable.bg_nokia_selected_dark : 0);
 	}
 
 	private void startRecording() {
@@ -232,7 +230,7 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 
 	@Override
 	public boolean onBack() {
-		// 录制态的 BACK 由 onKeyRecorded 处理（跳过当前项）；此处仅 INTRO 生效
+		// 录制态的 BACK 由 onKeyRecorded 处理（将其绑定为当前动作）；此处仅 INTRO 生效
 		if (state != STATE_INTRO) return true;
 		NokiaLog.i("KeyWizard", "返回键 -> 跳过");
 		finishWizard(false);
