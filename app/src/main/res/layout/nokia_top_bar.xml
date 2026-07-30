@@ -48,7 +48,7 @@
                     android:layout_height="15dp"
                     android:layout_marginStart="2dp"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/ic_signal_0" />
+                    app:srcCompat="@drawable/ic_signal_0" />
             </LinearLayout>
 
             <!-- SIM2 信号 -->
@@ -73,7 +73,7 @@
                     android:layout_height="15dp"
                     android:layout_marginStart="2dp"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/ic_signal_0" />
+                    app:srcCompat="@drawable/ic_signal_0" />
             </LinearLayout>
 
             <!-- WiFi（开启时显示） -->
@@ -132,8 +132,8 @@
             android:layout_width="24dp"
             android:layout_height="13dp"
             android:layout_marginEnd="6dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_nokia_battery" />
+        android:scaleType="fitCenter"
+        app:srcCompat="@drawable/ic_nokia_battery" />
 
         <TextView
             android:id="@+id/tvTime"

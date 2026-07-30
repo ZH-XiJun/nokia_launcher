@@ -5,6 +5,7 @@ import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
@@ -21,9 +22,9 @@ import ru.playsoftware.j2meloader.R;
 
 /**
  * 诺基亚风格界面的公共基类。
- * 设计基准为 240x320（参考截图）。每个布局由三个 240dp 宽的面板组成：
- *   id=topPanel   （高 18dp，贴顶、宽度铺满）
- *   id=midPanel   （高 280dp，贴左右、在顶/底之间垂直居中）
+ * 设计基准为 240x320（参考截图）。每个布局由三个面板组成：
+ *   id=topPanel   （高度由内容决定/wrap_content，贴顶、宽度铺满；顶栏组件优先完整显示）
+ *   id=midPanel   （高 262dp，贴左右、在顶/底之间垂直居中）
  *   id=bottomPanel（高 22dp，贴底、宽度铺满）
  * 外层 FrameLayout 铺满全屏并承载壁纸背景。基类按"宽度优先"计算缩放比
  *   scale = 屏幕宽度(dp) / 240
@@ -52,25 +53,23 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 				break;
 			}
 		}
-		if (!standard) {
-			if (dpi < 160) {
-				// 低分辨率设备（如 136 DPI → density 0.85）向上吸附到 mdpi(160)，
-				// 避免亚像素抗锯齿导致矢量图标发虚。
-				fixed = 160;
-			} else {
-				// 高分辨率但非标准密度（如 420 → 480）：吸附到最近的标准密度，
-				// 保留其高像素密度，否则会被压成 160 使图标在小屏上显得极小。
-				int nearest = standards[0];
-				int minDiff = Math.abs(dpi - nearest);
-				for (int s : standards) {
-					int diff = Math.abs(dpi - s);
-					if (diff < minDiff) {
-						minDiff = diff;
-						nearest = s;
-					}
+		if (dpi < 160) {
+			// ldpi 及以下（如 120 DPI → density 0.75）向上吸附到 mdpi(160)，
+			// 让 240x320 等小屏得到整数 scale=1，彻底消除 setScaleX/Y 的亚像素插值模糊。
+			fixed = 160;
+		} else if (!standard) {
+			// 高分辨率但非标准密度（如 420 → 480）：吸附到最近的标准密度，
+			// 保留其高像素密度，否则会被压成 160 使图标在小屏上显得极小。
+			int nearest = standards[0];
+			int minDiff = Math.abs(dpi - nearest);
+			for (int s : standards) {
+				int diff = Math.abs(dpi - s);
+				if (diff < minDiff) {
+					minDiff = diff;
+					nearest = s;
 				}
-				fixed = nearest;
 			}
+			fixed = nearest;
 		}
 		if (fixed != dpi) {
 			Configuration newConfig = new Configuration(config);
@@ -98,7 +97,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	private static final float BASE_W = 240f;
 	private static final float TOP_H = 36f;  // 加了运营商行（原 22dp + 14dp 运营商行）
 	private static final float BOT_H = 22f;
-	private static final float MID_H = 266f; // 324 - 36 - 22 (原 280f)
+	private static final float MID_H = 262f; // 320(设计总高) - 36(顶栏) - 22(底栏)
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -136,6 +135,15 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		if (BASE_W > 0 && 320f * scale > heightDp) {
 			scale = heightDp / 320f;
 		}
+		// 把接近整数的缩放比吸附到整数，避免 setScaleX/Y 亚像素插值导致的整体模糊。
+		// 例如 mdpi(scale=1)、高 DPI(scale=2) 等整数倍保持清晰；仅当与最近整数相差
+		// < 0.04 才吸附，避免明显改变布局。
+		if (Math.abs(scale - Math.round(scale)) < 0.04f) {
+			scale = Math.round(scale);
+		}
+		Log.i("NokiaScale", "applyScale densityDpi=" + dm.densityDpi
+				+ " density=" + density + " screenPx=" + dm.widthPixels + "x" + dm.heightPixels
+				+ " widthDp=" + widthDp + " heightDp=" + heightDp + " scale=" + scale);
 
 		View topPanel = findViewById(R.id.topPanel);
 		// 顶栏紧贴屏幕最顶部；FLAG_FULLSCREEN 已隐藏状态栏，不需要再下移。
@@ -149,18 +157,12 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		// 仅把内层 240dp 内容等比放大，并按比例设置栏高。
 		scalePanelContent(findViewById(R.id.bottomPanel), scale, BOT_H, density, false, true);
 
-		// 顶栏：始终以"原生分辨率"渲染（不做 setScaleX/Y 缩放），保证矢量图标清晰不模糊；
-		// 仅按比例设置栏高，内层宽度铺满屏幕、内容垂直居中。
+		// 顶栏：高度优先级最高，必须完整显示信号/WiFi/飞行模式/运营商等组件。
+		// 因此不再固定为 TOP_H*scale，而是让内容自然撑开（wrap_content）；
+		// 保持"原生分辨率"渲染（不做 setScaleX/Y 缩放），矢量图标清晰不模糊。
 		if (topPanel != null) {
-			if (topPanel instanceof ViewGroup && ((ViewGroup) topPanel).getChildCount() > 0) {
-				View content = ((ViewGroup) topPanel).getChildAt(0);
-				content.setPivotX(0);
-				content.setPivotY(0);
-				content.setScaleX(1);
-				content.setScaleY(1);
-			}
 			ViewGroup.LayoutParams lp = topPanel.getLayoutParams();
-			lp.height = Math.round(TOP_H * density * scale);
+			lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 			topPanel.setLayoutParams(lp);
 			topPanel.setVisibility(View.VISIBLE);
 		}
@@ -203,7 +205,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	}
 
 	/**
-	 * 缩放某个碎片的根视图（240dp × 280dp 的设计内容）并锚定到中间容器。
+	 * 缩放某个碎片的根视图（240dp × 262dp 的设计内容）并锚定到中间容器。
 	 * 内容统一从左上角等比放大铺满整宽（240dp × scale = 屏幕宽）。
 	 * 垂直位置（顶部对齐 / 居中）必须在布局完成后，用容器真实高度减去缩放后的
 	 * 内容高度来定，否则重力会基于"未缩放的小盒子"居中，导致内容下移、顶部留空、
@@ -221,11 +223,20 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		if (BASE_W > 0 && 320f * scale > heightDp) {
 			scale = heightDp / 320f;
 		}
+		if (Math.abs(scale - Math.round(scale)) < 0.04f) {
+			scale = Math.round(scale);
+		}
+		Log.i("NokiaScale", "scaleMidContent density=" + density
+				+ " widthDp=" + widthDp + " heightDp=" + heightDp + " scale=" + scale);
 
 		content.setPivotX(0);
 		content.setPivotY(0);
-		content.setScaleX(scale);
-		content.setScaleY(scale);
+		// scale≈1（240x320 基准屏 scale=1）时跳过 setScaleX/Y：避免硬件变换层
+		// 对像素做二次双线性过滤导致整体发虚；仅在确需缩放时才应用变换。
+		if (Math.abs(scale - 1f) >= 0.001f) {
+			content.setScaleX(scale);
+			content.setScaleY(scale);
+		}
 
 		final float fScale = scale;
 		final float fDensity = density;
@@ -239,13 +250,30 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 				View panel = (View) parent;
 				panel.setVisibility(View.VISIBLE);
 				int panelH = panel.getHeight();
-				// 垂直可视高度取内容实际布局高度（变高网格也适用），
-				// 仅当布局尚未完成时回退到设计基准 MID_H。
+				// 顶栏已改为 wrap_content 优先完整显示，中间容器高度可能小于 MID_H*scale。
+				// 若内容超出可用高度，整体等比缩小以完整显示，避免底部被裁切；
+				// 宽度会同步缩小产生极窄黑边，优先保证垂直完整。
 				int contentH = content.getHeight();
-				int visualH = contentH > 0
-						? (int) (contentH * fScale)
-						: (int) (MID_H * fDensity * fScale);
+				float finalScale = fScale;
+				int visualH;
+				if (contentH > 0) {
+					visualH = (int) (contentH * fScale);
+					if (panelH > 0 && visualH > panelH) {
+						finalScale = (float) panelH / contentH;
+						visualH = panelH;
+					}
+				} else {
+					visualH = (int) (MID_H * fDensity * fScale);
+				}
+				if (Math.abs(finalScale - 1f) >= 0.001f) {
+					content.setScaleX(finalScale);
+					content.setScaleY(finalScale);
+				}
 				int offset = topAlign ? 0 : Math.max(0, (panelH - visualH) / 2);
+				Log.i("NokiaScale", "scaleMidContent layout: panelH=" + panelH
+						+ " contentH=" + contentH + " visualH=" + visualH
+						+ " finalScale=" + finalScale + " offset=" + offset
+						+ " topAlign=" + topAlign);
 				content.setY(offset);
 			}
 		});
@@ -277,8 +305,11 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 				content.setPivotX(0);
 				content.setPivotY(0);
 			}
-			content.setScaleX(scale);
-			content.setScaleY(scale);
+			// scale≈1（240x320 基准屏 scale=1）时跳过变换层，避免顶/底栏像素被二次过滤发虚。
+			if (Math.abs(scale - 1f) >= 0.001f) {
+				content.setScaleX(scale);
+				content.setScaleY(scale);
+			}
 		}
 		if (setHeight) {
 			// 顶/底栏高度按 scale 放大，宽度由 match_parent 铺满。

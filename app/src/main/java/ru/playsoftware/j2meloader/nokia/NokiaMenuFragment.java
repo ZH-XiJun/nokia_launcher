@@ -90,12 +90,12 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 
 	/** 列数固定 3 列（诺基亚经典风格） */
 	private static final int COLS = 3;
-	/** 每格设计高度（dp），图标 36 + 标签 9 + 间距 */
-	private static final int ROW_H_DP = 64;
-	/** 标题预留高度（dp） */
-	private static final int TITLE_H_DP = 20;
-	/** 顶/底栏占用的设计高度（dp），用于估算可用网格高度 */
-	private static final int BAR_H_DP = 44;
+	/** 每格设计高度（dp），图标 36 + 标签 9 + 间距；240x320 上取 58 使 4 行完整且留余量不裁切 */
+	private static final int ROW_H_DP = 58;
+	/** 标题预留高度（dp，含功能表标题与网格上下内边距，留少量余量防裁切） */
+	private static final int TITLE_H_DP = 22;
+	/** 顶/底栏占用的设计高度（dp）= 36(顶) + 22(底)，用于估算可用网格高度 */
+	private static final int BAR_H_DP = 58;
 
 	private final ArrayList<NokiaAppItem> items = new ArrayList<>();
 	private LinearLayout appGrid;
@@ -370,6 +370,9 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 					ImageView iv = new ImageView(requireContext());
 					iv.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
 					if (item.icon != null) {
+						// 关闭缩放过滤：S60 图标为 nodpi 位图，最近邻缩放更锐利、契合复古风格，
+						// 避免 36dp 内降采样发虚（API 19 尤其明显）；真实应用图标密度感知，影响甚微。
+						item.icon.setFilterBitmap(false);
 						iv.setImageDrawable(item.icon);
 					}
 					TextView tv = new TextView(requireContext());

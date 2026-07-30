@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 首次启动按键绑定向导（碎片）：240dp 宽 × 280dp 高，由基类缩放。 -->
+<!-- 首次启动按键绑定向导（碎片）：240dp 宽 × 262dp 高，由基类缩放。
+     262dp = 320 - 36 - 22，正好填满中间容器不被裁切。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="240dp"
-    android:layout_height="280dp"
+    android:layout_height="262dp"
     android:orientation="vertical"
     android:background="@drawable/bg_nokia_menu">
 

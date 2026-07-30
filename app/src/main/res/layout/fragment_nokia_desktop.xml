@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 桌面待机屏中间内容（碎片）：240dp 宽 × 280dp 高，由基类缩放。
+<!-- 桌面待机屏中间内容（碎片）：240dp 宽 × 262dp 高，由基类缩放。
+     262dp = 320(设计总高) - 36(顶栏) - 22(底栏)，正好填满中间容器不被裁切。
      运营商名(中国移动/联通等)已迁到 nokia_top_bar.xml，由 StatusBarController 统一管理。 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="240dp"
-    android:layout_height="280dp">
+    android:layout_height="262dp">
 
     <!-- 快捷栏上方的点线分割线 -->
     <View
@@ -159,7 +160,7 @@
                 android:layout_width="14dp"
                 android:layout_height="12dp"
                 android:layout_marginEnd="6dp"
-                android:src="@drawable/ic_nokia_cal_small" />
+                app:srcCompat="@drawable/ic_nokia_cal_small" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -185,5 +186,5 @@
         android:layout_marginBottom="6dp"
         android:layout_marginEnd="10dp"
         android:alpha="0.15"
-        android:src="@drawable/deco_rings" />
+        app:srcCompat="@drawable/deco_rings" />
 </RelativeLayout>
