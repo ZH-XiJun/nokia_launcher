@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=240, initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a14;
+    padding: 20px;
+    display: flex;
+    gap: 20px;
+  }
+
+  /* 模拟手机屏幕 240x320 */
+  .phone {
+    width: 240px;
+    height: 320px;
+    background: linear-gradient(180deg, #0d1b3e 0%, #1a3a6b 40%, #0d1b3e 100%);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    font-family: 'Consolas', 'Courier New', monospace;
+  }
+
+  /* 状态栏 */
+  .statusbar {
+    height: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 6px;
+    font-size: 9px;
+    color: #fff;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  /* 快捷栏 */
+  .shortcut-bar {
+    display: flex;
+    gap: 2px;
+    padding: 3px 4px;
+    align-items: center;
+    height: 28px;
+  }
+  .shortcut-icon {
+    width: 20px; height: 20px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #ccc;
+  }
+
+  .divider {
+    height: 1px;
+    margin: 0 6px;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,0.15) 0 2px, transparent 2px 4px);
+  }
+
+  /* 组件区域 */
+  .widget-area {
+    padding: 2px 8px;
+  }
+  .widget-row {
+    display: flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 4px;
+    border-radius: 3px;
+  }
+  .widget-row.selected {
+    background: rgba(33, 150, 243, 0.4);
+  }
+
+  /* 图标用纯 CSS 模拟诺基亚风格 */
+  .ico {
+    width: 14px; height: 14px;
+    margin-right: 5px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* 日历图标：白底方块+红色顶角 */
+  .ico-cal {
+    width: 14px; height: 12px;
+    background: #fff;
+    border-radius: 1px;
+    position: relative;
+  }
+  .ico-cal::before, .ico-cal::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    width: 3px; height: 3px;
+    background: #F44336;
+  }
+  .ico-cal::before { left: 2px; }
+  .ico-cal::after { right: 2px; }
+
+  /* 内存图标：蓝色小方块 */
+  .ico-mem {
+    width: 12px; height: 10px;
+    background: #2196F3;
+    border-radius: 1px;
+    border-right: 2px solid #FF9800;
+  }
+
+  /* 存储图标：灰色方块 */
+  .ico-storage {
+    width: 12px; height: 10px;
+    background: #BDBDBD;
+    border-radius: 1px;
+    border: 1px solid #757575;
+  }
+  .ico-storage::after {
+    content: '';
+    display: block;
+    width: 6px; height: 1px;
+    background: #757575;
+    margin: 1px auto;
+  }
+
+  /* 时长图标：小钟表 */
+  .ico-clock {
+    width: 12px; height: 12px;
+    border: 1.5px solid #fff;
+    border-radius: 50%;
+    position: relative;
+  }
+  .ico-clock::after {
+    content: '';
+    position: absolute;
+    top: 1px; left: 50%;
+    width: 1px; height: 4px;
+    background: #fff;
+    transform-origin: bottom;
+  }
+
+  /* 音乐图标 */
+  .ico-music {
+    width: 12px; height: 12px;
+    position: relative;
+  }
+  .ico-music::before {
+    content: '♪';
+    font-size: 13px;
+    color: #F44336;
+    line-height: 1;
+  }
+
+  /* 网址图标 */
+  .ico-web {
+    width: 12px; height: 12px;
+    border: 1.5px solid #fff;
+    border-radius: 50%;
+    position: relative;
+  }
+  .ico-web::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: 50%;
+    width: 1px; height: 14px;
+    background: #fff;
+    transform: translateX(-50%);
+  }
+
+  .widget-label {
+    color: #fff;
+    font-size: 10px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+  }
+
+  .spacer { flex: 1; }
+
+  /* 进度条 */
+  .progress-bar {
+    width: 50px;
+    height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+  .progress-fill.mem { background: #4FC3F7; }
+  .progress-fill.storage { background: #81C784; }
+
+  .percent {
+    color: rgba(255,255,255,0.5);
+    font-size: 8px;
+    margin-left: 3px;
+    font-family: 'Consolas', monospace;
+    min-width: 20px;
+    text-align: right;
+  }
+
+  .tag {
+    color: rgba(255,255,255,0.3);
+    font-size: 7px;
+    margin-left: 3px;
+    font-family: 'Consolas', monospace;
+  }
+
+  /* 底部软键栏 */
+  .softkey-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0; right: 0;
+    height: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 8px;
+    background: rgba(0,0,0,0.3);
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .softkey-bar span {
+    color: rgba(255,255,255,0.6);
+    font-size: 9px;
+    font-family: 'Consolas', monospace;
+  }
+
+  /* 装饰圆环 */
+  .deco-rings {
+    position: absolute;
+    bottom: 24px;
+    right: 8px;
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.05);
+    opacity: 0.5;
+  }
+  .deco-rings::before {
+    content: '';
+    position: absolute;
+    top: 8px; left: 8px;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .label-note {
+    color: #666;
+    font-size: 8px;
+    padding-left: 20px;
+    height: 18px;
+    line-height: 18px;
+    font-family: 'Consolas', monospace;
+  }
+</style>
+</head>
+<body>
+
+<!-- 桌面效果 -->
+<div class="phone">
+  <div class="statusbar">
+    <span>中国移动</span>
+    <span>12:30</span>
+  </div>
+
+  <div class="shortcut-bar">
+    <div class="shortcut-icon">📞</div>
+    <div class="shortcut-icon">✉</div>
+    <div class="shortcut-icon">🌐</div>
+    <div class="shortcut-icon">🎵</div>
+    <div class="shortcut-icon">📷</div>
+    <div class="shortcut-icon">⚙</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="widget-area">
+    <!-- 日历 -->
+    <div class="widget-row">
+      <div class="ico"><div class="ico-cal"></div></div>
+      <div class="widget-label">7月30日 农历六月廿六</div>
+      <div class="spacer"></div>
+    </div>
+
+    <!-- 内存（选中态） -->
+    <div class="widget-row selected">
+      <div class="ico"><div class="ico-mem"></div></div>
+      <div class="widget-label">RAM 2.1G/4G</div>
+      <div class="spacer"></div>
+      <div class="progress-bar"><div class="progress-fill mem" style="width: 52%"></div></div>
+      <div class="percent">52%</div>
+    </div>
+
+    <!-- 存储 -->
+    <div class="widget-row">
+      <div class="ico"><div class="ico-storage"></div></div>
+      <div class="widget-label">存储 45G/128G</div>
+      <div class="spacer"></div>
+      <div class="progress-bar"><div class="progress-fill storage" style="width: 35%"></div></div>
+      <div class="percent">35%</div>
+    </div>
+
+    <!-- 使用时长 -->
+    <div class="widget-row">
+      <div class="ico"><div class="ico-clock"></div></div>
+      <div class="widget-label">今日 2h 30m</div>
+      <div class="spacer"></div>
+    </div>
+
+    <!-- 应用（对比） -->
+    <div class="widget-row">
+      <div class="ico"><div class="ico-music"></div></div>
+      <div class="widget-label">音乐播放器</div>
+      <div class="spacer"></div>
+    </div>
+
+    <!-- 网址（对比） -->
+    <div class="widget-row">
+      <div class="ico"><div class="ico-web"></div></div>
+      <div class="widget-label">3g.qq.com</div>
+      <div class="spacer"></div>
+    </div>
+
+    <div class="label-note">无更多备忘</div>
+  </div>
+
+  <div class="deco-rings"></div>
+
+  <div class="softkey-bar">
+    <span>选项</span>
+    <span>返回</span>
+  </div>
+</div>
+
+</body>
+</html>
