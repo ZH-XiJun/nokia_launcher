@@ -2,42 +2,31 @@
 setlocal
 
 REM ============================================================
-REM  Install the latest debug APK from /dist via adb
+REM  Install the latest debug APK from /dist via adb.
+REM  When multiple devices are connected the install runs in
+REM  parallel for every device; one device failing does NOT
+REM  block the others.
+REM
 REM  Usage:
-REM    install_debug.bat            (default connected device)
-REM    install_debug.bat <serial>   (adb -s <serial>)
+REM    install_debug.bat            (install to ALL connected devices)
+REM    install_debug.bat <serial>   (install only to the given device)
 REM ============================================================
 
-set "DIST_DIR=%~dp0dist"
-set "SERIAL=%1"
+set "SCRIPT=%~dp0install_debug.py"
 
-set "APK="
-for /f "delims=" %%F in ('dir /b /o:-d /a:-d "%DIST_DIR%\*.apk" 2^>nul') do (
-    set "APK=%%F"
-    goto :found
-)
-:found
-if "%APK%"=="" (
-    echo [ERROR] No APK in dist. Run build_debug.bat first.
+if not exist "%SCRIPT%" (
+    echo [ERROR] install_debug.py not found next to this bat.
     pause
     exit /b 1
 )
 
-set "APK_PATH=%DIST_DIR%\%APK%"
-echo Installing APK: %APK_PATH%
+python "%SCRIPT%" %*
+set "RC=%errorlevel%"
 
-if "%SERIAL%"=="" (
-    echo Installing to default device ...
-    adb install -r "%APK_PATH%"
-) else (
-    echo Installing to device %SERIAL% ...
-    adb -s %SERIAL% install -r "%APK_PATH%"
-)
-
-if errorlevel 1 (
-    echo [ERROR] Install failed. Make sure a device is connected via adb.
+if not "%RC%"=="0" (
+    echo [ERROR] Install failed. Check the per-device results above.
     pause
-    exit /b 1
+    exit /b %RC%
 )
 
 echo Install done.
