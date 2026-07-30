@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>快捷开关栏预览 v3</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 20px; }
+.phone {
+  width: 240px; height: 320px; background: linear-gradient(180deg, #0d1b3e 0%, #1a3a6b 40%, #0d1b3e 100%);
+  border-radius: 8px; overflow: hidden; position: relative; display: flex; flex-direction: column;
+  border: 2px solid #333;
+}
+/* 状态栏 */
+.statusbar { height: 18px; display: flex; justify-content: space-between; align-items: center; padding: 0 8px; color: #fff; font-size: 9px; font-family: monospace; }
+/* 快捷栏 */
+.shortcut-bar { height: 28px; display: flex; align-items: center; padding: 0 4px; gap: 4px; }
+.shortcut-bar .icon { width: 20px; height: 20px; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+.shortcut-bar .icon.selected { background: rgba(33,150,243,0.4); border: 1px solid #2196F3; }
+/* 分割线 */
+.divider { height: 1px; margin: 0 6dp; border-bottom: 1px dashed rgba(255,255,255,0.15); margin: 0 6px; }
+/* 快捷开关栏 */
+.toggle-bar { height: 28px; display: flex; align-items: center; padding: 0 6px; gap: 4px; overflow-x: auto; overflow-y: hidden; }
+.toggle-bar::-webkit-scrollbar { display: none; }
+.toggle-cell {
+  width: 24px; height: 22px; border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; position: relative; cursor: pointer; transition: all 0.2s;
+}
+.toggle-cell .icon-svg { width: 14px; height: 14px; }
+.toggle-cell.selected {
+  background: rgba(33,150,243,0.4) !important;
+  border: 1px solid #2196F3;
+}
+/* 双状态-开 */
+.toggle-cell.on-wifi { background: rgba(79,195,247,0.18); }
+.toggle-cell.on-bt { background: rgba(79,195,247,0.18); }
+.toggle-cell.on-torch { background: rgba(255,235,59,0.18); }
+.toggle-cell.on-mute { background: rgba(244,67,54,0.18); }
+/* 双状态-关 */
+.toggle-cell.off { background: rgba(255,255,255,0.04); }
+/* 跳转开关 */
+.toggle-cell.jump { background: rgba(255,152,0,0.12); }
+/* 动作开关 */
+.toggle-cell.action { background: rgba(255,255,255,0.06); }
+/* 组件区域 */
+.widget-area { flex: 1; padding: 4px 6px; overflow-y: auto; }
+.widget-row { height: 22px; display: flex; align-items: center; gap: 5px; color: #fff; font-size: 11px; font-family: monospace; }
+.widget-row.selected { background: rgba(33,150,243,0.4); border-radius: 4px; }
+.widget-row .w-icon { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; }
+.progress-bar { width: 50px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; margin-left: auto; }
+.progress-fill { height: 100%; border-radius: 2px; }
+.progress-fill.mem { background: #4FC3F7; }
+.progress-fill.stor { background: #81C784; }
+.pct { font-size: 9px; color: rgba(255,255,255,0.5); margin-left: 3px; font-family: monospace; }
+/* 装饰圆环 */
+.deco { position: absolute; bottom: 30px; right: 10px; pointer-events: none; opacity: 0.05; }
+.deco .ring1 { width: 60px; height: 60px; border: 2px solid #fff; border-radius: 50%; position: absolute; bottom: 0; right: 0; }
+.deco .ring2 { width: 44px; height: 44px; border: 2px solid #fff; border-radius: 50%; position: absolute; bottom: 8px; right: 8px; }
+/* 软键栏 */
+.softkey-bar { height: 20px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; padding: 0 8px; }
+.softkey-bar span { font-size: 9px; color: rgba(255,255,255,0.7); }
+/* SVG 图标 */
+.icon-svg path, .icon-svg circle, .icon-svg line { stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- 状态栏 -->
+  <div class="statusbar">
+    <span>中国移动</span>
+    <span>12:30</span>
+  </div>
+  
+  <!-- 快捷栏 -->
+  <div class="shortcut-bar">
+    <div class="icon" style="background:rgba(255,255,255,0.06)">📞</div>
+    <div class="icon" style="background:rgba(255,255,255,0.06)">📶</div>
+    <div class="icon" style="background:rgba(255,255,255,0.06)">✉</div>
+    <div class="icon selected">♪</div>
+    <div class="icon" style="background:rgba(255,255,255,0.06)">📷</div>
+    <div class="icon" style="background:rgba(255,255,255,0.06)">⚙</div>
+  </div>
+  
+  <div class="divider"></div>
+  
+  <!-- 快捷开关栏 -->
+  <div class="toggle-bar" id="toggleBar">
+    <!-- WiFi (开) -->
+    <div class="toggle-cell on-wifi" data-type="wifi" data-state="on">
+      <svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14">
+        <path d="M2 8 Q12 -2 22 8" stroke="#4FC3F7"/>
+        <path d="M6 12 Q12 6 18 12" stroke="#4FC3F7"/>
+        <path d="M10 16 Q12 14 14 16" stroke="#4FC3F7"/>
+        <circle cx="12" cy="19" r="1.5" fill="#4FC3F7" stroke="none"/>
+      </svg>
+    </div>
+    <!-- 蓝牙 (开) -->
+    <div class="toggle-cell on-bt" data-type="bt" data-state="on">
+      <svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14">
+        <path d="M7 5 L17 19 L12 24 L12 0 L17 5 L7 19" stroke="#4FC3F7"/>
+      </svg>
+    </div>
+    <!-- 手电筒 (关) -->
+    <div class="toggle-cell off" data-type="torch" data-state="off">
+      <svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14">
+        <path d="M9 2 Q9 0.5 12 0.5 Q15 0.5 15 2 L15 14 Q15 16 12 16 Q9 16 9 14 Z" stroke="#666"/>
+        <line x1="12" y1="16" x2="12" y2="22" stroke="#666"/>
+      </svg>
+    </div>
+    <!-- 锁屏 (动作) 选中态 -->
+    <div class="toggle-cell action selected" data-type="lock" data-state="action">
+      <svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14">
+        <rect x="5" y="11" width="14" height="11" rx="2" stroke="#FFF"/>
+        <path d="M8 11 V7 Q8 3 12 3 Q16 3 16 7 V11" stroke="#FFF"/>
+      </svg>
+    </div>
+    <!-- 飞行模式 (跳转) -->
+    <div class="toggle-cell jump" data-type="airplane" data-state="jump">
+      <svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14">
+        <path d="M2 16 L22 9 L12 11 L9 5 L7 6 L9 13 L4 15 L3 13 L2 14 Z" stroke="#FF9800" fill="rgba(255,152,0,0.3)"/>
+      </svg>
+    </div>
+    <!-- 静音 (关) -->
+    <div class="toggle-cell off" data-type="mute" data-state="off">
+      <svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14">
+        <path d="M3 9 L3 15 L7 15 L12 19 L12 5 L7 9 Z" stroke="#666" fill="rgba(100,100,100,0.3)"/>
+        <line x1="17" y1="9" x2="22" y2="15" stroke="#666"/>
+        <line x1="22" y1="9" x2="17" y2="15" stroke="#666"/>
+      </svg>
+    </div>
+    <!-- 音量+ (动作) -->
+    <div class="toggle-cell action" data-type="volup" data-state="action">
+      <svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14">
+        <path d="M3 9 L3 15 L7 15 L12 19 L12 5 L7 9 Z" stroke="#FFF" fill="rgba(255,255,255,0.1)"/>
+        <path d="M16 10 L16 14" stroke="#FFF"/>
+        <path d="M14 12 L18 12" stroke="#FFF"/>
+      </svg>
+    </div>
+  </div>
+  
+  <div class="divider"></div>
+  
+  <!-- 桌面组件区域 -->
+  <div class="widget-area">
+    <!-- 日历 -->
+    <div class="widget-row">
+      <span class="w-icon">📅</span>
+      <span>7月30日 农历六月廿六</span>
+    </div>
+    <!-- 内存 (选中) -->
+    <div class="widget-row selected">
+      <span class="w-icon">📊</span>
+      <span>RAM 2.1G/4G</span>
+      <div class="progress-bar"><div class="progress-fill mem" style="width:52%"></div></div>
+      <span class="pct">52%</span>
+    </div>
+    <!-- 存储 -->
+    <div class="widget-row">
+      <span class="w-icon">💾</span>
+      <span>存储 45G/128G</span>
+      <div class="progress-bar"><div class="progress-fill stor" style="width:35%"></div></div>
+      <span class="pct">35%</span>
+    </div>
+    <!-- 使用时长 -->
+    <div class="widget-row">
+      <span class="w-icon">⏱️</span>
+      <span>今日 2h 30m</span>
+    </div>
+    <!-- 音乐播放器 -->
+    <div class="widget-row">
+      <span class="w-icon">♪</span>
+      <span>音乐播放器</span>
+    </div>
+    <!-- 3g.qq.com -->
+    <div class="widget-row">
+      <span class="w-icon">🌐</span>
+      <span>3g.qq.com</span>
+    </div>
+  </div>
+  
+  <!-- 装饰圆环 -->
+  <div class="deco">
+    <div class="ring1"></div>
+    <div class="ring2"></div>
+  </div>
+  
+  <!-- 软键栏 -->
+  <div class="softkey-bar">
+    <span>选项</span>
+    <span></span>
+    <span>返回</span>
+  </div>
+</div>
+
+<script>
+// 点击切换开关状态
+document.querySelectorAll('.toggle-cell').forEach(cell => {
+  cell.addEventListener('click', () => {
+    const type = cell.dataset.type;
+    const state = cell.dataset.state;
+    
+    // 选中态
+    document.querySelectorAll('.toggle-cell').forEach(c => c.classList.remove('selected'));
+    cell.classList.add('selected');
+    
+    // 双状态开关切换
+    if (state === 'on') {
+      cell.dataset.state = 'off';
+      cell.classList.remove('on-wifi', 'on-bt', 'on-torch', 'on-mute');
+      cell.classList.add('off');
+      // 图标变灰
+      cell.querySelectorAll('path, circle').forEach(el => {
+        el.setAttribute('stroke', '#666');
+        if (el.tagName === 'circle') el.setAttribute('fill', '#666');
+      });
+    } else if (state === 'off') {
+      cell.dataset.state = 'on';
+      cell.classList.remove('off');
+      const colorMap = { wifi: '#4FC3F7', bt: '#4FC3F7', torch: '#FFEB3B', mute: '#F44336' };
+      const classMap = { wifi: 'on-wifi', bt: 'on-bt', torch: 'on-torch', mute: 'on-mute' };
+      cell.classList.add(classMap[type] || 'on-wifi');
+      const color = colorMap[type] || '#4FC3F7';
+      cell.querySelectorAll('path, circle').forEach(el => {
+        el.setAttribute('stroke', color);
+        if (el.tagName === 'circle') el.setAttribute('fill', color);
+      });
+    }
+  });
+});
+</script>
+</body>
+</html>
