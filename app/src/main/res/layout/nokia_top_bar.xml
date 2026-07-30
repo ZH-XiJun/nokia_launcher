@@ -6,6 +6,7 @@
      顶部第二行：双卡运营商名(无 SIM 时隐藏)。
      标题(topTitle)由每个页面在运行时设置（顶部第一行居中位置）。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/topPanel"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -82,7 +83,7 @@
                 android:layout_height="15dp"
                 android:layout_marginStart="8dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_nokia_wifi"
+                app:srcCompat="@drawable/ic_nokia_wifi"
                 android:visibility="gone" />
 
             <!-- 蓝牙（开启时显示） -->
@@ -92,7 +93,7 @@
                 android:layout_height="15dp"
                 android:layout_marginStart="6dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_nokia_bluetooth"
+                app:srcCompat="@drawable/ic_nokia_bluetooth"
                 android:visibility="gone" />
 
             <!-- 飞行模式（开启时显示） -->
@@ -102,7 +103,7 @@
                 android:layout_height="15dp"
                 android:layout_marginStart="6dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_nokia_airplane"
+                app:srcCompat="@drawable/ic_nokia_airplane"
                 android:visibility="gone" />
         </LinearLayout>
 

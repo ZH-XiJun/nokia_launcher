@@ -2,6 +2,7 @@
 <!-- 桌面待机屏中间内容（碎片）：240dp 宽 × 280dp 高，由基类缩放。
      运营商名(中国移动/联通等)已迁到 nokia_top_bar.xml，由 StatusBarController 统一管理。 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="240dp"
     android:layout_height="280dp">
 
@@ -113,7 +114,7 @@
                 android:layout_width="16dp"
                 android:layout_height="16dp"
                 android:layout_marginEnd="6dp"
-                android:src="@drawable/ic_nokia_web" />
+                app:srcCompat="@drawable/ic_nokia_web" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -135,7 +136,7 @@
                 android:layout_width="16dp"
                 android:layout_height="16dp"
                 android:layout_marginEnd="6dp"
-                android:src="@drawable/ic_nokia_lock" />
+                app:srcCompat="@drawable/ic_nokia_lock" />
             <TextView
                 android:id="@+id/notifLockText"
                 android:layout_width="wrap_content"

@@ -123,7 +123,12 @@ public class StatusBarController {
 		simCarrierContainer = activity.findViewById(R.id.simCarrierContainer);
 
 		telephonyManager = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
-		subscriptionManager = (SubscriptionManager) activity.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
+		// SubscriptionManager 仅在 API 22+ 存在（双卡订阅），API 19 无此类，
+		// 直接引用会 NoClassDefFoundError；低版本保持 null，后续使用点均已守卫并降级单卡。
+		if (Build.VERSION.SDK_INT >= 22) {
+			subscriptionManager = (SubscriptionManager) activity.getSystemService(
+					Context.TELEPHONY_SUBSCRIPTION_SERVICE);
+		}
 		wifiManager = (WifiManager) activity.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 
 		// 双卡信号需要 READ_PHONE_STATE，缺失则请求（缺失时退化为单卡监听）。

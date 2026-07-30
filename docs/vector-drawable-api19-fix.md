@@ -1,0 +1,62 @@
+# 安卓 4.4（API 19）矢量图崩溃修复计划
+
+> 设备 `4a24ecf`：Android 4.4 / SDK 19，240×320。
+> 应用 `io.github.cctyl.nokia.debug`，入口 `NokiaDesktopActivity`。
+> 现状：启动即崩溃，系统 `Force finishing` 该 Activity。
+
+## 一、根因
+1. Android 4.4（API 19）框架原生不认识 `<vector>` 标签；用 `android:src` 引用矢量图时走框架 `Resources.loadDrawable`，直接抛 `invalid drawable tag vector`。API ≥ 21 设备原生支持矢量图，因此掩盖了该问题。
+2. `app/build.gradle` 第 19 行 `vectorDrawables.useSupportLibrary = true`：构建期不为矢量图生成 PNG 回退，矢量图只能由支持库加载。
+3. 应用虽已 `AppCompatDelegate.setCompatVectorFromResourcesEnabled(true)`，但该标志只覆盖 `app:srcCompat` 与代码加载路径，**无法覆盖 `android:src` 的布局膨胀路径**，故崩溃仍发生。
+
+## 二、崩溃证据（logcat，pid 5768）
+```
+E/AndroidRuntime: FATAL EXCEPTION: main
+  java.lang.RuntimeException: Unable to start activity ...NokiaDesktopActivity:
+    android.view.InflateException: Binary XML file line #86: Error inflating class ImageView
+  Caused by: android.content.res.Resources$NotFoundException:
+    File res/drawable/ic_nokia_wifi.xml ...
+  Caused by: org.xmlpull.v1.XmlPullParserException:
+    Binary XML file line #7: invalid drawable tag vector
+```
+
+## 三、必须修复（首屏 100% 崩溃，硬阻塞 4.4 启动）
+全部为布局里用 `android:src` 引用 `<vector>`，且位于 `NokiaDesktopActivity` 首屏：
+
+| # | 文件 | 行 | 当前写法 | 矢量资源 |
+|---|---|---|---|---|
+| 1 | `res/layout/nokia_top_bar.xml` | 85 | `android:src="@drawable/ic_nokia_wifi"` | ✅ vector |
+| 2 | `res/layout/nokia_top_bar.xml` | 95 | `android:src="@drawable/ic_nokia_bluetooth"` | ✅ vector |
+| 3 | `res/layout/nokia_top_bar.xml` | 105 | `android:src="@drawable/ic_nokia_airplane"` | ✅ vector |
+| 4 | `res/layout/fragment_nokia_desktop.xml` | 116 | `android:src="@drawable/ic_nokia_web"` | ✅ vector |
+| 5 | `res/layout/fragment_nokia_desktop.xml` | 138 | `android:src="@drawable/ic_nokia_lock"` | ✅ vector |
+
+> 修掉第 1 处后，2~5 会依次暴露，必须一次性全改。
+> 两个布局根标签**只声明了 `xmlns:android`，未声明 `xmlns:app`**，改 `app:srcCompat` 前需补 `xmlns:app="http://schemas.android.com/apk/res-auto"`。
+
+## 四、已确认安全（无需改）
+- **其它布局已正确使用 `app:srcCompat`**：`fragment_apps_list.xml:28` `ic_add_white`；`activity_config.xml:41/69/98/329` `ic_list`/`ic_swap`/`ic_add_preset`/`ic_baseline_tune_24`。
+- **代码路径（经 AppCompat 安全加载）**：
+  - `StatusBarController.java`：`ic_wifi_0~3`、`ic_signal_0~4`、`ic_battery_0~100` 经 `AppCompatImageView.setImageResource(...)`。
+  - `NokiaMenuFragment.java:326` `safeDrawable()` 用 `ContextCompat.getDrawable`。
+  - `NokiaDesktopSettingsFragment.java:85` `ContextCompat.getDrawable(ITEM_ICONS[i])`（`ic_nokia_settings`）。
+  - `AppsListFragment.java:406-407` `AppCompatResources.getDrawable`（`ic_arrow_up/down`）。
+  - `NokiaShortcutSettingsFragment` / `NokiaDesktopFragment` / `NokiaBoxFragment`：均用 `ContextCompat.getDrawable` 或文件加载。
+- **非矢量 XML（layer-list/shape，API 19 可正常 inflate）**：`ic_signal_0/1~4`、`ic_battery_0~100`、`ic_nokia_battery`、`ic_nokia_cal_small`、`deco_rings`。
+
+## 五、低风险 / 经分析判定安全（不在首屏，建议回归验证）
+以下走 AppCompat 包装的 `Context.getDrawable`，理论上安全：
+- 菜单图标（4 处 vector）：`menu/midlet_displayable.xml`（`ic_action_keyboard`、`ic_action_screenshot`）、`menu/main.xml`（`ic_setting_sort`）、`menu/activity_profiles.xml`（`ic_add_white`）。
+- Preference 图标（11 处 vector）：`xml/preferences.xml` 全部 `android:icon`（`ic_setting_theme/black_background/enable_action_bar/enable_statusbar/add_cutout_area/keep_screen_on/screenshot/enable_vibration/default/folder/message`）。
+- 本轮**不改动**上述菜单/Preference（避免引入 `app:icon` 兼容风险），仅作回归验证项。
+
+## 六、修复步骤
+1. `nokia_top_bar.xml`：根标签补 `xmlns:app`，第 85/95/105 行 `android:src` → `app:srcCompat`。
+2. `fragment_nokia_desktop.xml`：根标签补 `xmlns:app`，第 116/138 行 `android:src` → `app:srcCompat`。
+3. 全工程审计结论：除以上 5 处外，其余矢量引用均走安全路径，无需改动。
+
+## 七、验证
+- 修复后在 `4a24ecf`（API 19，240×320）重新安装并启动桌面，确认不再出现 `invalid drawable tag vector` / `InflateException`。
+- 实际查看顶栏（信号/WiFi/蓝牙/飞行/电池）与桌面快捷入口图标均正常显示。
+- 高版本设备（320×480、16:9）回归，确认无视觉回退（`app:srcCompat` 在 API 21+ 等价于 `android:src`）。
+- 回归菜单（MainActivity 等）与设置页（`preferences.xml`）图标，确认无崩溃。
