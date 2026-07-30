@@ -511,4 +511,35 @@ Activity 快捷组件存储为 `NokiaWidgetItem`：
 
 ---
 
+## 十三、Android 版本兼容性
+
+Activity 快捷组件使用的全部是 API 1+ 的基础 API，**全版本兼容，无需版本分支**。
+
+| 功能 | API | 兼容性 |
+|------|-----|--------|
+| `PackageManager.getPackageInfo(pkg, GET_ACTIVITIES)` | 1 | ✅ |
+| `ActivityInfo.exported` | 1 | ✅ |
+| `ActivityInfo.loadLabel(pm)` | 1 | ✅ |
+| `pm.queryIntentActivities()` | 1 | ✅ |
+| `pm.getApplicationIcon(packageName)` | 1 | ✅ |
+| `intent.setClassName(pkg, cls)` | 1 | ✅ |
+| `startActivity(intent)` | 1 | ✅ |
+
+> Android 4.4（API 19）完全兼容，无降级处理。
+
+### 矢量图加载注意
+
+Activity 快捷组件桌面显示用的图标是 `PackageManager.getApplicationIcon()` 返回的应用图标（BitmapDrawable / AdaptiveIconDrawable），**不是 vector drawable**，无兼容性问题。
+
+但如果步骤2列表中使用了通用 Activity 图标（如 `ic_nokia_activity_default.xml`）作为占位图，则该图标如果是 vector drawable，需遵守：
+
+| 场景 | 正确写法 |
+|------|----------|
+| 布局 XML | `app:srcCompat="@drawable/ic_nokia_xxx"` |
+| 代码加载 | `ContextCompat.getDrawable()` / `AppCompatResources.getDrawable()` |
+
+> 详见 `docs/vector-drawable-api19-fix.md`。
+
+---
+
 > **编号 6。**
