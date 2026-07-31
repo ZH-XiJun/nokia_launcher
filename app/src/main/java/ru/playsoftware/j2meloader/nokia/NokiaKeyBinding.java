@@ -212,4 +212,46 @@ public class NokiaKeyBinding {
 				+ " -> 未绑定(-1)");
 		return -1;
 	}
+
+	/**
+	 * 供诺基亚桌面各弹窗（Dialog / DialogFragment）复用：把一次按键事件按当前绑定解析，
+	 * 并分发到左/右软键动作，避免各弹窗写死 keyCode。
+	 *
+	 * @param event            按键事件
+	 * @param leftAction       左软键动作（可为 null）
+	 * @param rightAction      右软键动作（可为 null）
+	 * @param backAction       返回键动作（可为 null；传 null 表示不拦截 BACK，交给系统处理）
+	 * @param consumeUnmapped  是否消费方向键/确认键/未绑定键。
+	 *                         信息类弹窗（无输入框/列表）传 true；
+	 *                         含 EditText / 列表的表单弹窗传 false，避免破坏文本输入与导航。
+	 * @return 是否消费了该事件
+	 */
+	public boolean dispatchDialogKey(KeyEvent event, Runnable leftAction,
+			Runnable rightAction, Runnable backAction, boolean consumeUnmapped) {
+		if (event.getAction() != KeyEvent.ACTION_DOWN) {
+			return true; // 消费抬起事件，避免重复触发
+		}
+		if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+			if (backAction != null) {
+				backAction.run();
+				return true;
+			}
+			return false; // 不拦截 BACK，交给系统（如可取消弹窗的默认关闭）
+		}
+		int action = resolveAction(event);
+		switch (action) {
+			case ACTION_SOFT_LEFT:
+				if (leftAction != null) leftAction.run();
+				return true;
+			case ACTION_SOFT_RIGHT:
+				if (rightAction != null) rightAction.run();
+				return true;
+			case ACTION_SELECT:
+			case ACTION_LEFT:
+			case ACTION_RIGHT:
+				return consumeUnmapped; // 表单弹窗返回 false，留给 EditText/列表
+			default:
+				return false;
+		}
+	}
 }

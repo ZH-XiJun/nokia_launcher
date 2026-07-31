@@ -18,6 +18,7 @@ package ru.playsoftware.j2meloader.info;
 
 import android.app.Dialog;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.webkit.WebView;
 
 import javax.microedition.util.ContextHolder;
@@ -27,6 +28,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.text.HtmlCompat;
 import androidx.fragment.app.DialogFragment;
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 
 public class LicensesDialogFragment extends DialogFragment {
 	@NonNull
@@ -38,6 +40,10 @@ public class LicensesDialogFragment extends DialogFragment {
 		builder.setTitle(R.string.licenses)
 				.setIcon(R.mipmap.ic_launcher)
 				.setMessage(message);
-		return builder.create();
+		Dialog dialog = builder.create();
+		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		dialog.setOnKeyListener((d, keyCode, event) ->
+				keyBinding.dispatchDialogKey(event, this::dismiss, this::dismiss, this::dismiss, true));
+		return dialog;
 	}
 }

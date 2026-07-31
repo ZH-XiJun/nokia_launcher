@@ -23,8 +23,10 @@ import android.app.Dialog;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.content.DialogInterface;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -38,6 +40,7 @@ import java.util.Collections;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.databinding.DialogLoadProfileBinding;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 
 public class LoadProfileDialog extends DialogFragment {
 	private ArrayList<Profile> profiles;
@@ -103,6 +106,22 @@ public class LoadProfileDialog extends DialogFragment {
 			}
 		}
 		return builder.create();
+	}
+
+	@Override
+	public void onStart() {
+		super.onStart();
+		AlertDialog dialog = (AlertDialog) getDialog();
+		if (dialog == null) return;
+		Button btnOk = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+		Button btnCancel = dialog.getButton(DialogInterface.BUTTON_NEGATIVE);
+		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		dialog.setOnKeyListener((d, keyCode, event) -> keyBinding.dispatchDialogKey(
+				event,
+				() -> { if (btnCancel != null) btnCancel.performClick(); },  // 左软键 -> 取消
+				() -> { if (btnOk != null) btnOk.performClick(); },          // 右软键 -> 确定(加载)
+				null,   // 返回键交给系统（可取消弹窗默认关闭）
+				false)); // 含列表，不消费方向键/确认键，避免破坏导航
 	}
 
 	private void onItemClick(AdapterView<?> adapterView, View view, int pos, long l) {

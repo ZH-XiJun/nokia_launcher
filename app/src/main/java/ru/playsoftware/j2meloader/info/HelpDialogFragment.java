@@ -21,6 +21,7 @@ import android.app.Dialog;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
+import android.view.KeyEvent;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -28,6 +29,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 
 public class HelpDialogFragment extends DialogFragment {
 	@NonNull
@@ -46,6 +48,10 @@ public class HelpDialogFragment extends DialogFragment {
 		builder.setTitle(R.string.help)
 				.setIcon(R.mipmap.ic_launcher)
 				.setView(tv);
-		return builder.create();
+		Dialog dialog = builder.create();
+		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		dialog.setOnKeyListener((d, keyCode, event) ->
+				keyBinding.dispatchDialogKey(event, this::dismiss, this::dismiss, this::dismiss, true));
+		return dialog;
 	}
 }

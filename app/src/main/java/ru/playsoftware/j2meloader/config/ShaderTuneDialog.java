@@ -32,6 +32,7 @@ import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.config.ShaderInfo.Setting;
 import ru.playsoftware.j2meloader.databinding.DialogShaderTuneBinding;
 import ru.playsoftware.j2meloader.databinding.DialogShaderTuneItemBinding;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 
 public class ShaderTuneDialog extends DialogFragment {
 
@@ -115,10 +116,18 @@ public class ShaderTuneDialog extends DialogFragment {
 		parentBinding.negativeButton.setOnClickListener(v1 -> dismiss());
 		parentBinding.positiveButton.setOnClickListener(v1 -> onClickOk());
 		parentBinding.neutralButton.setOnClickListener(v1 -> onClickReset());
-		return new AlertDialog.Builder(requireActivity())
+		AlertDialog dialog = new AlertDialog.Builder(requireActivity())
 			.setTitle(R.string.shader_tuning)
 			.setView(parentBinding.getRoot())
 			.create();
+		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireActivity());
+		dialog.setOnKeyListener((d, keyCode, event) -> keyBinding.dispatchDialogKey(
+				event,
+				() -> parentBinding.negativeButton.performClick(), // 左软键 -> 关闭
+				() -> parentBinding.positiveButton.performClick(), // 右软键 -> 确定
+				null,   // 返回键交给系统（setCancelable(false)，强制用按钮关闭）
+				false)); // 含 SeekBar，不消费方向键/确认键，避免破坏调节
+		return dialog;
 	}
 
 	private void onClickReset() {

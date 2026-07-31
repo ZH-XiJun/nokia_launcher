@@ -22,12 +22,14 @@ import android.content.Context;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
+import android.view.KeyEvent;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 
 public class InfoDialogFragment extends DialogFragment {
 	@NonNull
@@ -46,6 +48,10 @@ public class InfoDialogFragment extends DialogFragment {
 		builder.setTitle(R.string.app_name)
 				.setIcon(R.mipmap.ic_launcher)
 				.setView(tv);
-		return builder.create();
+		Dialog dialog = builder.create();
+		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		dialog.setOnKeyListener((d, keyCode, event) ->
+				keyBinding.dispatchDialogKey(event, this::dismiss, this::dismiss, this::dismiss, true));
+		return dialog;
 	}
 }

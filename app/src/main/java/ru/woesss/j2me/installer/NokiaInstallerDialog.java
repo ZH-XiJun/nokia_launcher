@@ -26,6 +26,8 @@ import ru.playsoftware.j2meloader.applist.AppItem;
 import ru.playsoftware.j2meloader.applist.AppListModel;
 import ru.playsoftware.j2meloader.appsdb.AppRepository;
 import ru.playsoftware.j2meloader.config.Config;
+import ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 import ru.playsoftware.j2meloader.nokia.NokiaLog;
 
 /**
@@ -73,9 +75,6 @@ public class NokiaInstallerDialog extends DialogFragment {
 	// 结果状态
 	private AppItem installedApp;
 	private String errorMessage;
-
-	// 焦点（结果状态下左右软键切换）：0 = 左软键，1 = 右软键
-	private int focusIndex = 0;
 
 	public static NokiaInstallerDialog newInstance(Uri uri) {
 		NokiaInstallerDialog dialog = new NokiaInstallerDialog();
@@ -165,38 +164,32 @@ public class NokiaInstallerDialog extends DialogFragment {
 	// ============================
 
 	private void setupKeyListener(Dialog dialog) {
+		// 接入用户自定义按键映射，与桌面行为 100% 一致（禁止写死 keyCode）
+		final NokiaKeyBinding keyBinding =
+				((NokiaDesktopActivity) requireActivity()).getKeyBinding();
 		dialog.setOnKeyListener((d, keyCode, event) -> {
 			if (event.getAction() != KeyEvent.ACTION_DOWN) {
-				return true; // 消费抬起事件
+				return true; // 消费抬起事件，避免重复触发
 			}
-
-			switch (keyCode) {
-				case KeyEvent.KEYCODE_DPAD_LEFT:
-					if (uiState == UI_STATE_SUCCESS) {
-						setFocus(0);
-					}
-					return true;
-				case KeyEvent.KEYCODE_DPAD_RIGHT:
-					if (uiState == UI_STATE_SUCCESS) {
-						setFocus(1);
-					}
-					return true;
-				case KeyEvent.KEYCODE_DPAD_CENTER:
-				case KeyEvent.KEYCODE_ENTER:
-					if (uiState == UI_STATE_SUCCESS) {
-						trigger(focusIndex);
-					} else if (uiState == UI_STATE_ERROR) {
-						dismiss();
-					}
-					return true;
-				case KeyEvent.KEYCODE_SOFT_LEFT:
+			// 返回键由弹窗自己处理（NokiaKeyBinding 不管 BACK）
+			if (keyCode == KeyEvent.KEYCODE_BACK) {
+				onBackKey();
+				return true;
+			}
+			int action = keyBinding.resolveAction(event);
+			switch (action) {
+				case NokiaKeyBinding.ACTION_SOFT_LEFT:
 					onSoftKey(0);
 					return true;
-				case KeyEvent.KEYCODE_SOFT_RIGHT:
+				case NokiaKeyBinding.ACTION_SOFT_RIGHT:
 					onSoftKey(1);
 					return true;
-				case KeyEvent.KEYCODE_BACK:
-					onBackKey();
+				case NokiaKeyBinding.ACTION_SELECT:
+					// 内容区无可选中项，确认键只消费，绝不触发左右软键
+					return true;
+				case NokiaKeyBinding.ACTION_LEFT:
+				case NokiaKeyBinding.ACTION_RIGHT:
+					// 软键没有"焦点"概念，方向键左/右直接忽略（消费）
 					return true;
 				default:
 					return false;
@@ -249,24 +242,8 @@ public class NokiaInstallerDialog extends DialogFragment {
 	}
 
 	// ============================
-	// 焦点管理（结果状态）
+	// 触发动作（无焦点概念，直接按软键索引触发）
 	// ============================
-
-	private void setFocus(int index) {
-		focusIndex = index;
-		applyFocus();
-	}
-
-	private void applyFocus() {
-		if (softLeft == null || softRight == null) return;
-		if (focusIndex == 0) {
-			softLeft.setBackgroundResource(R.drawable.bg_nokia_selected);
-			softRight.setBackgroundResource(0);
-		} else {
-			softRight.setBackgroundResource(R.drawable.bg_nokia_selected);
-			softLeft.setBackgroundResource(0);
-		}
-	}
 
 	private void trigger(int index) {
 		if (index == 0 && installedApp != null) {
@@ -449,10 +426,6 @@ public class NokiaInstallerDialog extends DialogFragment {
 			softRight.setText("完成");
 			softRight.setVisibility(View.VISIBLE);
 		}
-
-		// 默认焦点在"完成"（右软键），避免误触打开
-		focusIndex = 1;
-		applyFocus();
 	}
 
 	private void showErrorUi() {

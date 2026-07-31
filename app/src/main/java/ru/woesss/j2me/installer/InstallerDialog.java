@@ -24,6 +24,7 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.SpannableStringBuilder;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
@@ -43,6 +44,7 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.applist.AppItem;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 import ru.playsoftware.j2meloader.applist.AppListModel;
 import ru.playsoftware.j2meloader.appsdb.AppRepository;
 import ru.playsoftware.j2meloader.config.Config;
@@ -137,12 +139,13 @@ public class InstallerDialog extends DialogFragment {
 	@Override
 	public void onStart() {
 		super.onStart();
-		if (installer != null) {
-			return;
-		}
 		btnOk = mDialog.getButton(DialogInterface.BUTTON_POSITIVE);
 		btnClose = mDialog.getButton(DialogInterface.BUTTON_NEGATIVE);
 		btnRun = mDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+		setupKeyListener();
+		if (installer != null) {
+			return;
+		}
 		hideButtons();
 		Bundle args = requireArguments();
 		Uri uri = args.getParcelable(ARG_URI);
@@ -152,6 +155,17 @@ public class InstallerDialog extends DialogFragment {
 		}
 		int id = args.getInt(ARG_ID);
 		reinstallApp(id);
+	}
+
+	private void setupKeyListener() {
+		// 接入用户自定义按键映射，与桌面行为 100% 一致（禁止写死 keyCode）
+		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		mDialog.setOnKeyListener((d, keyCode, event) -> keyBinding.dispatchDialogKey(
+				event,
+				() -> { if (btnClose != null && btnClose.getVisibility() == View.VISIBLE) btnClose.performClick(); }, // 左软键 -> 取消/关闭
+				() -> { if (btnOk != null && btnOk.getVisibility() == View.VISIBLE) btnOk.performClick(); },          // 右软键 -> 主操作(安装/启动/确认)
+				() -> { if (btnClose != null && btnClose.getVisibility() == View.VISIBLE) btnClose.performClick(); }, // 返回键 -> 取消/关闭
+				true));
 	}
 
 	private void installApp(String path, Uri uri) {

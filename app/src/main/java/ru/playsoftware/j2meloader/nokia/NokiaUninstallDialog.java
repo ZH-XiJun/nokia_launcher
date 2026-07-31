@@ -23,8 +23,6 @@ public class NokiaUninstallDialog extends DialogFragment {
 	private static final String TAG = "UninstallDialog";
 	private static final String ARG_NAME = "app_name";
 
-	/** 0 = 卸载（左，确认），1 = 取消（右） */
-	private int focusIndex = 0;
 	private TextView softLeft;
 	private TextView softRight;
 	private ConfirmListener confirmListener;
@@ -67,9 +65,6 @@ public class NokiaUninstallDialog extends DialogFragment {
 			content.setText("是否卸载「" + appName + "」？");
 		}
 
-		// 默认高亮"取消"（右），避免误触卸载
-		setFocus(1);
-
 		// 触摸支持：点击软键 = 直接触发该项
 		if (softLeft != null) {
 			softLeft.setOnClickListener(v -> trigger(0));
@@ -78,36 +73,37 @@ public class NokiaUninstallDialog extends DialogFragment {
 			softRight.setOnClickListener(v -> trigger(1));
 		}
 
+		// 接入用户自定义按键映射，与桌面行为 100% 一致（禁止写死 keyCode）
+		final NokiaKeyBinding keyBinding =
+				((NokiaDesktopActivity) requireActivity()).getKeyBinding();
 		dialog.setOnKeyListener((d, keyCode, event) -> {
 			if (event.getAction() != KeyEvent.ACTION_DOWN) {
 				// 消费抬起事件，避免重复触发
 				return true;
 			}
-			NokiaLog.d(TAG, "onKey keyCode=" + keyCode
-					+ " focusIndex=" + focusIndex);
-			switch (keyCode) {
-				case KeyEvent.KEYCODE_DPAD_LEFT:
-					setFocus(0);
-					return true;
-				case KeyEvent.KEYCODE_DPAD_RIGHT:
-					setFocus(1);
-					return true;
-				case KeyEvent.KEYCODE_SOFT_LEFT:
-				case KeyEvent.KEYCODE_MENU:
-					NokiaLog.i(TAG, "左软键/菜单键：确认卸载");
+			NokiaLog.d(TAG, "onKey keyCode=" + keyCode);
+			// 返回键由弹窗自己处理（NokiaKeyBinding 不管 BACK）
+			if (keyCode == KeyEvent.KEYCODE_BACK) {
+				NokiaLog.i(TAG, "返回键：取消卸载");
+				trigger(1);
+				return true;
+			}
+			int action = keyBinding.resolveAction(event);
+			switch (action) {
+				case NokiaKeyBinding.ACTION_SOFT_LEFT:
+					NokiaLog.i(TAG, "左软键：确认卸载");
 					trigger(0);
 					return true;
-				case KeyEvent.KEYCODE_SOFT_RIGHT:
+				case NokiaKeyBinding.ACTION_SOFT_RIGHT:
 					NokiaLog.i(TAG, "右软键：取消卸载");
 					trigger(1);
 					return true;
-				case KeyEvent.KEYCODE_DPAD_CENTER:
-				case KeyEvent.KEYCODE_ENTER:
-					trigger(focusIndex);
+				case NokiaKeyBinding.ACTION_SELECT:
+					// 内容区无可选中项，确认键只消费，绝不触发左右软键
 					return true;
-				case KeyEvent.KEYCODE_BACK:
-					NokiaLog.i(TAG, "返回键：取消卸载");
-					trigger(1);
+				case NokiaKeyBinding.ACTION_LEFT:
+				case NokiaKeyBinding.ACTION_RIGHT:
+					// 软键没有"焦点"概念，方向键左/右直接忽略（消费）
 					return true;
 				default:
 					return false;
@@ -115,22 +111,6 @@ public class NokiaUninstallDialog extends DialogFragment {
 		});
 
 		return dialog;
-	}
-
-	private void setFocus(int index) {
-		focusIndex = index;
-		applyFocus();
-	}
-
-	private void applyFocus() {
-		if (softLeft == null || softRight == null) return;
-		if (focusIndex == 0) {
-			softLeft.setBackgroundResource(R.drawable.bg_nokia_selected);
-			softRight.setBackgroundResource(0);
-		} else {
-			softRight.setBackgroundResource(R.drawable.bg_nokia_selected);
-			softLeft.setBackgroundResource(0);
-		}
 	}
 
 	private void trigger(int index) {

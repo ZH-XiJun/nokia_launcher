@@ -17,10 +17,13 @@
 package ru.playsoftware.j2meloader.info;
 
 import android.app.Dialog;
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.method.ScrollingMovementMethod;
 import android.text.util.Linkify;
+import android.view.KeyEvent;
+import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -28,6 +31,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import ru.playsoftware.j2meloader.BuildConfig;
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 
 public class AboutDialogFragment extends DialogFragment {
 	@NonNull
@@ -64,5 +68,22 @@ public class AboutDialogFragment extends DialogFragment {
 					infoDialogFragment.show(getParentFragmentManager(), "more");
 				});
 		return builder.create();
+	}
+
+	@Override
+	public void onStart() {
+		super.onStart();
+		AlertDialog dialog = (AlertDialog) getDialog();
+		if (dialog == null) return;
+		// positive = "许可"(R.string.licenses，靠右)，neutral = "更多"(R.string.more，靠左)
+		Button btnLicenses = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+		Button btnMore = dialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		dialog.setOnKeyListener((d, keyCode, event) -> keyBinding.dispatchDialogKey(
+				event,
+				() -> { if (btnMore != null) btnMore.performClick(); },       // 左软键 -> 更多
+				() -> { if (btnLicenses != null) btnLicenses.performClick(); }, // 右软键 -> 许可
+				this::dismiss,                                                  // 返回 -> 关闭
+				true));
 	}
 }
