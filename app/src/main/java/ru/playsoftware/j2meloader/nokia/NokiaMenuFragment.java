@@ -280,7 +280,6 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 		// 应用程序图标：优先用 S60 应用程序图标
 		Drawable boxIcon = safeDrawable(host, R.drawable.s60_app);
 		if (boxIcon == null) boxIcon = safeDrawable(host, R.drawable.ic_nokia_box);
-		Drawable kbIcon = safeDrawable(host, R.drawable.ic_nokia_settings);
 		Drawable settingsIcon = safeDrawable(host, R.drawable.s60_settings);
 		if (settingsIcon == null) settingsIcon = safeDrawable(host, R.drawable.ic_nokia_settings);
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_BOX, "应用程序", boxIcon, null));
@@ -289,7 +288,6 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 		if (mainIcon == null) mainIcon = boxIcon;
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_MAIN, "J2ME Loader", mainIcon, null));
 		NokiaLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入原始 MainActivity）");
-		items.add(new NokiaAppItem(NokiaAppItem.TYPE_KEYBIND, "按键绑定", kbIcon, null));
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_SETTINGS, "桌面设置", settingsIcon, null));
 
 		// 将 pool 拆分为已匹配 S60 图标 和 未匹配，匹配的排在前面
@@ -590,10 +588,6 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 			} catch (Exception e) {
 				NokiaLog.e("Menu", "启动 MainActivity 失败", e);
 			}
-			return true;
-		}
-		if (item.type == NokiaAppItem.TYPE_KEYBIND) {
-			((NokiaDesktopActivity) requireActivity()).openFragment(new NokiaKeyBindFragment());
 			return true;
 		}
 		if (item.type == NokiaAppItem.TYPE_SETTINGS) {
