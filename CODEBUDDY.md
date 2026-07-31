@@ -33,6 +33,17 @@
 - 新增功能、改 UI、加逻辑时，优先在 `app/src/main/java/ru/playsoftware/j2meloader/nokia/` 目录下的诺基亚桌面相关代码中进行，而非 J2ME-Loader 原有的 `MainActivity` 等模块。
 
 
+## 界面简介
+
+- 桌面
+NokiaDesktopActivity， 就是按下HOME返回的界面，这里展示一些信息，和一些快捷入口
+
+- 功能表
+从桌面按下左键进入功能表，功能表里就是各种应用，和设置
+
+- 桌面设置
+从桌面按下右键进入桌面设置，主要是 诺基亚桌面自身的一些设置。比如，按键绑定，顶部快捷栏设置，壁纸设置，桌面组件设置等。
+
 ## J2ME-Loader介绍
 
 J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Java ME games by reimplementing the J2ME APIs on top of the Android runtime and translating MIDlet bytecode to run on Android. This repo is a fork of J2meLoader. It is a standard multi-module Gradle/Android project (Groovy DSL, AGP 8.5.1, Gradle 8.7). A skill documenting the local Gradle network/signing fixes lives at `.claude/skills/android-gradle-build` (read it before changing build config or signing).
@@ -55,9 +66,7 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 没有我的允许，不能私自提交git。
 
 
-## Android 4.4 (API 19) 兼容性踩坑经验
-
-本应用需兼容到 Android 4.4 (API 19)。4.4 设备实测（序列号 `4a24ecf`，240×320）暴露了多处以高版本不崩、低版本必崩的问题，修复后沉淀经验如下：
+## Android 4.4 (API 19) 兼容性踩坑
 
 1. **矢量图 / drawable 膨胀**：4.4 的 `Resources` 在膨胀含特定 `vectorDrawables` 或 drawable 的布局时易抛 `InflateException` / `invalid drawable`。涉及顶栏、桌面背景等图形资源时，优先用兼容写法（如 `AppCompat` 矢量、或自定义 `Drawable`）；构建侧已开启 `vectorDrawables.useSupportLibrary`。
 2. **`android.telephony.SubscriptionManager` 是 API 22+ 才有的类**。`StatusBarController` 中对该类的强制类型转换必须用 `Build.VERSION.SDK_INT >= 22` 守卫，否则 4.4 上 `NoClassDefFoundError`。其余使用点（双卡监听、`getPhoneCount` 等）也须守卫并降级单卡。
@@ -75,11 +84,10 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 
 
 ## 设备说明
-通过tcpip链接的设备是 320*480分辨率的，可以直接通过adb安装应用。
-通过usb链接的，adb查看名为jz5dauzlu8euw4e6 的设备，是小米设备，是 现代 16:9 及以上比例的长条形屏幕，不支持直接通过adb安装应用，你推送到 `adb -s jz5dauzlu8euw4e6 push "d:/project/nokia_desktop/app/build/outputs/apk/open/debug/J2ME_Loader-1.8.2-open-debug.apk" /sdcard/Download/J2ME_Loader-open-debug.apk` 设备文件中即可。我会来安装。
-这个设备当然也支持adb 查看日志等操作，只是不支持直接安装。
+- 通过tcpip链接的设备是 320*480分辨率的，可以直接通过adb安装应用。
+- 通过usb链接的，adb查看名为jz5dauzlu8euw4e6 的设备，是小米设备，是 现代 16:9 及以上比例的长条形屏幕，不支持直接通过adb安装应用，你推送到 `adb -s jz5dauzlu8euw4e6 push "d:/project/nokia_desktop/app/build/outputs/apk/open/debug/J2ME_Loader-1.8.2-open-debug.apk" /sdcard/Download/J2ME_Loader-open-debug.apk` 设备文件中即可。我会来安装。这个设备当然也支持adb 查看日志等操作，只是不支持直接安装。
 
-设备名为 4a24ecf 的是 240*320分辨率的设备，安卓4.4.
+- 设备名为 4a24ecf 的是 240*320分辨率的设备，安卓4.4.
 
 
 ## Common commands
