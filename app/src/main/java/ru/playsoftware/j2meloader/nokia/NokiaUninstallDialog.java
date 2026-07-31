@@ -2,6 +2,7 @@ package ru.playsoftware.j2meloader.nokia;
 
 import android.app.Dialog;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -54,6 +55,7 @@ public class NokiaUninstallDialog extends DialogFragment {
 		if (dialog.getWindow() != null) {
 			dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
 					ViewGroup.LayoutParams.WRAP_CONTENT);
+			dialog.getWindow().setGravity(Gravity.BOTTOM);
 			dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 		}
 
@@ -109,6 +111,9 @@ public class NokiaUninstallDialog extends DialogFragment {
 					return false;
 			}
 		});
+
+		// Android 12+：Dialog 窗口首个导航键会被触摸模式吞掉，show 后强制退出该状态
+		dialog.setOnShowListener(d -> NokiaDialogFocus.forceNonTouchMode(dialog));
 
 		return dialog;
 	}
