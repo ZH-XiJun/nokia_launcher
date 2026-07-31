@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import ru.playsoftware.j2meloader.MainActivity;
 import ru.playsoftware.j2meloader.R;
 
 /**
@@ -283,6 +284,11 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 		Drawable settingsIcon = safeDrawable(host, R.drawable.s60_settings);
 		if (settingsIcon == null) settingsIcon = safeDrawable(host, R.drawable.ic_nokia_settings);
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_BOX, "应用程序", boxIcon, null));
+		// 原始 J2ME-Loader 主界面（启动器/文件选择器/应用列表）入口
+		Drawable mainIcon = safeDrawable(host, R.mipmap.ic_launcher);
+		if (mainIcon == null) mainIcon = boxIcon;
+		items.add(new NokiaAppItem(NokiaAppItem.TYPE_MAIN, "J2ME Loader", mainIcon, null));
+		NokiaLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入原始 MainActivity）");
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_KEYBIND, "按键绑定", kbIcon, null));
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_SETTINGS, "桌面设置", settingsIcon, null));
 
@@ -572,6 +578,18 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 
 		if (item.type == NokiaAppItem.TYPE_BOX) {
 			((NokiaDesktopActivity) requireActivity()).openBox();
+			return true;
+		}
+		if (item.type == NokiaAppItem.TYPE_MAIN) {
+			try {
+				Intent main = new Intent(requireActivity(), MainActivity.class);
+				main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+						| Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+				startActivity(main);
+				NokiaLog.i("Menu", "进入原始 J2ME-Loader 主界面 MainActivity");
+			} catch (Exception e) {
+				NokiaLog.e("Menu", "启动 MainActivity 失败", e);
+			}
 			return true;
 		}
 		if (item.type == NokiaAppItem.TYPE_KEYBIND) {
