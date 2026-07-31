@@ -9,6 +9,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -63,6 +64,17 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	private int focusIndex = -1;
 	private View selectedView = null;
 
+	// ---- 选项菜单覆盖层（应用内 overlay，替代 Dialog 独立窗口）----
+	private static final int OPT_LAUNCH = 0;
+	private static final int OPT_SETTINGS = 1;
+	private static final int OPT_UNINSTALL = 2;
+	private FrameLayout optionsOverlay;
+	private TextView optionTitle;
+	private LinearLayout[] optionRows;
+	private AppItem optionsApp;
+	private boolean optionsMenuOpen = false;
+	private int optionsFocusIndex = 0;
+
 	// ---- 数据 ----
 	private AppRepository appRepository;
 	private List<AppItem> appItems = new ArrayList<>();
@@ -116,6 +128,8 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 
 		appScroll = view.findViewById(R.id.appScroll);
 		appContainer = view.findViewById(R.id.appContainer);
+
+		initOptionsOverlay(view);
 
 		computeRowsPerPage();
 
@@ -383,6 +397,9 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onDirection(int direction) {
+		if (optionsMenuOpen) {
+			return onDirectionOptions(direction);
+		}
 		return onDirectionGrid(direction);
 	}
 
@@ -443,6 +460,10 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onSelect() {
+		if (optionsMenuOpen) {
+			triggerOption(optionsFocusIndex);
+			return true;
+		}
 		if (focusIndex < 0 || totalGridCells == 0) return false;
 
 		if (focusIndex == 0) {
@@ -470,33 +491,126 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	}
 
 	// ============================
-	// 选项菜单（左软键弹出）
+	// 选项菜单（左软键弹出，应用内 overlay）
 	// ============================
 
 	/**
-	 * 弹出诺基亚风格选项菜单弹窗（启动/设置/卸载）。
+	 * 初始化选项菜单覆盖层：把面板布局（dialog_nokia_app_options.xml）挂到 overlay 上，
+	 * 绑定选项行与触摸点击。按键导航不经过覆盖层，统一由 NokiaFocusHost 接口接管。
+	 */
+	private void initOptionsOverlay(View root) {
+		optionsOverlay = root.findViewById(R.id.optionsOverlay);
+		if (optionsOverlay == null) return;
+
+		View panel = LayoutInflater.from(requireContext())
+				.inflate(R.layout.dialog_nokia_app_options, optionsOverlay, false);
+		FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+				ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+		lp.gravity = Gravity.CENTER;
+		panel.setLayoutParams(lp);
+		optionsOverlay.addView(panel);
+
+		optionTitle = panel.findViewById(R.id.options_title);
+		optionRows = new LinearLayout[3];
+		optionRows[OPT_LAUNCH] = panel.findViewById(R.id.option_launch);
+		optionRows[OPT_SETTINGS] = panel.findViewById(R.id.option_settings);
+		optionRows[OPT_UNINSTALL] = panel.findViewById(R.id.option_uninstall);
+
+		for (int i = 0; i < optionRows.length; i++) {
+			final int idx = i;
+			if (optionRows[i] != null) {
+				optionRows[i].setOnClickListener(v -> {
+					setOptionsFocus(idx);
+					triggerOption(idx);
+				});
+			}
+		}
+	}
+
+	/**
+	 * 弹出诺基亚风格选项菜单（启动/设置/卸载）。
 	 */
 	private void showAppOptionsMenu(AppItem app) {
-		NokiaLog.i("Box", "弹出选项菜单: " + app.getTitle());
-		NokiaAppOptionsDialog dialog = NokiaAppOptionsDialog.newInstance(app.getTitle());
-		dialog.setOptionsListener(new NokiaAppOptionsDialog.OptionsListener() {
-			@Override
-			public void onLaunch() {
+		if (app == null || optionsOverlay == null) return;
+		NokiaLog.i("Box", "弹出选项菜单(overlay): " + app.getTitle());
+		optionsApp = app;
+		if (optionTitle != null) optionTitle.setText(app.getTitle());
+		optionsFocusIndex = OPT_LAUNCH;
+		applyOptionsFocus();
+		optionsMenuOpen = true;
+		optionsOverlay.setVisibility(View.VISIBLE);
+	}
+
+	/** 关闭选项菜单，恢复网格导航。 */
+	private void closeOptionsMenu() {
+		NokiaLog.i("Box", "关闭选项菜单");
+		optionsMenuOpen = false;
+		optionsApp = null;
+		if (optionsOverlay != null) {
+			optionsOverlay.setVisibility(View.GONE);
+		}
+	}
+
+	private void setOptionsFocus(int index) {
+		optionsFocusIndex = index;
+		applyOptionsFocus();
+	}
+
+	private void applyOptionsFocus() {
+		if (optionRows == null) return;
+		for (int i = 0; i < optionRows.length; i++) {
+			if (optionRows[i] != null) {
+				optionRows[i].setBackgroundResource(
+						i == optionsFocusIndex ? R.drawable.bg_nokia_selected_dark : 0);
+			}
+		}
+	}
+
+	private boolean onDirectionOptions(int direction) {
+		switch (direction) {
+			case NokiaKeyBinding.ACTION_UP:
+				if (optionsFocusIndex > OPT_LAUNCH) {
+					setOptionsFocus(optionsFocusIndex - 1);
+				}
+				return true;
+			case NokiaKeyBinding.ACTION_DOWN:
+				if (optionsFocusIndex < OPT_UNINSTALL) {
+					setOptionsFocus(optionsFocusIndex + 1);
+				}
+				return true;
+			case NokiaKeyBinding.ACTION_LEFT:
+			case NokiaKeyBinding.ACTION_RIGHT:
+				// 方向键左右无功能，消费掉避免穿透
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	private void triggerOption(int index) {
+		if (optionsApp == null) {
+			closeOptionsMenu();
+			return;
+		}
+		AppItem app = optionsApp;
+		NokiaLog.i("Box", "选项菜单触发: " + index);
+		closeOptionsMenu();
+		switch (index) {
+			case OPT_LAUNCH:
 				NokiaLog.i("Box", "选项菜单-启动: " + app.getTitle());
 				Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
-			}
-			@Override
-			public void onSettings() {
+				break;
+			case OPT_SETTINGS:
 				NokiaLog.i("Box", "选项菜单-设置: " + app.getTitle());
 				Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), true);
-			}
-			@Override
-			public void onUninstall() {
+				break;
+			case OPT_UNINSTALL:
 				NokiaLog.i("Box", "选项菜单-卸载: " + app.getTitle());
 				showUninstallDialog(app);
-			}
-		});
-		dialog.show(getParentFragmentManager(), "app_options");
+				break;
+			default:
+				break;
+		}
 	}
 
 	// ============================
@@ -551,6 +665,11 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onSoftLeft() {
+		// 菜单打开时左软键关闭菜单（等效返回）
+		if (optionsMenuOpen) {
+			closeOptionsMenu();
+			return true;
+		}
 		// JAR 应用（focusIndex >= 2）→ 选项菜单
 		if (focusIndex >= 2) {
 			int appIdx = focusIndex - 2;
@@ -566,12 +685,20 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onSoftRight() {
+		if (optionsMenuOpen) {
+			closeOptionsMenu();
+			return true;
+		}
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}
 
 	@Override
 	public boolean onBack() {
+		if (optionsMenuOpen) {
+			closeOptionsMenu();
+			return true;
+		}
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}
