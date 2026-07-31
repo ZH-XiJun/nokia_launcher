@@ -35,7 +35,7 @@ import ru.playsoftware.j2meloader.filepicker.FilteredFilePickerFragment;
 import ru.playsoftware.j2meloader.util.AppUtils;
 import ru.playsoftware.j2meloader.util.Constants;
 import ru.playsoftware.j2meloader.util.FileUtils;
-import ru.woesss.j2me.installer.InstallerDialog;
+import ru.woesss.j2me.installer.NokiaInstallerDialog;
 
 /**
  * 应用程序中间内容碎片。
@@ -514,7 +514,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 		preferences.edit()
 				.putString(Constants.PREF_LAST_PATH, FilteredFilePickerFragment.getLastPath())
 				.apply();
-		InstallerDialog.newInstance(uri).show(getChildFragmentManager(), "installer");
+		NokiaInstallerDialog.newInstance(uri).show(getChildFragmentManager(), "installer");
 	}
 
 	// ============================
