@@ -65,6 +65,51 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 
 没有我的允许，不能私自提交git。
 
+## 按键处理规范（重要）
+
+**凡是菜单 / 弹窗 / Dialog 中涉及物理按键处理的地方，都必须复用用户自定义的按键映射（`NokiaKeyBinding`），禁止写死 keyCode。**
+
+背景与原因：
+
+1. 用户在「桌面设置 → 按键绑定设置」里可以自定义左软键、右软键、确认键、方向键等映射。这套映射由 `ru.playsoftware.j2meloader.nokia.NokiaKeyBinding` 统一维护，桌面层 `NokiaDesktopActivity.dispatchKeyEvent` 通过 `keyBinding.resolveAction(event)` 把 keyCode 解析成语义动作（`ACTION_SOFT_LEFT` / `ACTION_SOFT_RIGHT` / `ACTION_SELECT` / `ACTION_LEFT` / `ACTION_RIGHT` 等），并自带兜底（如 `KEYCODE_MENU` → `ACTION_SOFT_LEFT`、`KEYCODE_ENTER`/`SPACE`/`BUTTON_A` → `ACTION_SELECT`）。
+2. **Dialog / DialogFragment 是独立 Window，弹出后按键事件到不了 `NokiaDesktopActivity`，Activity 的 `dispatchKeyEvent` 对其无效。** 所以弹窗必须自己接入 `NokiaKeyBinding`，不能指望桌面帮它解析。
+3. 写死 `KEYCODE_SOFT_LEFT` 这类 keyCode 的写法是错误的：(a) 漏掉 `KEYCODE_MENU` 等用户实际设备发出的键码，导致左/右软键"没反应"；(b) 完全无视用户在按键绑定设置里的自定义，用户改了绑定对弹窗无效。
+
+正确做法：
+
+- 在弹窗 `onCreate` 里通过 `((NokiaDesktopActivity) requireActivity()).getKeyBinding()` 取得真实绑定实例（`NokiaDesktopActivity` 已暴露 public 方法）。
+- `setOnKeyListener` 里先 `keyBinding.resolveAction(event)` 解析成动作，再按动作分发；`KEYCODE_BACK` 由弹窗自己单独处理（`NokiaKeyBinding` 不管 BACK）。
+- 已有案例：`NokiaUninstallDialog` 当前是写死 + 硬编码 `KEYCODE_MENU` 才"恰好能用"，同样未接入绑定，属于同类隐患，应一并改成接入 `NokiaKeyBinding`；新增 / 修改任何弹窗、菜单按键逻辑时，一律以接入 `NokiaKeyBinding` 为标准，与桌面行为 100% 一致。
+
+
+## 软键栏（底部左右菜单）禁止加高亮 / 焦点逻辑（重要）
+
+**底部软键栏的左右两个文字，就只是物理左 / 右软键的标签，禁止给它加任何"选中态高亮"或"焦点切换"机制。** 这是反复踩过的坑，务必遵守。
+
+背景与原因：
+
+1. 在真机上，左软键、右软键是**两个固定的物理键**，底部左右文字只是它们的标签，左右键直接对应左右文字，**不存在"当前选中的是哪个软键"这种概念**。给软键栏套"焦点 + 高亮"逻辑是错误的。
+2. 软键栏底部布局通常是 `layout_width="0dp" + layout_weight="1"` 把宽度**平分给左右各 50%** 的写法（如 `dialog_nokia_installer.xml`、`dialog_nokia_uninstall.xml`、`nokia_bottom_bar.xml`）。一旦给某个软键设置 `bg_nokia_selected` 背景，背景会**填满整个 TextView 的 bounds**，于是出现"明明只有两个字，高亮却占了 50% 宽度"的色块——这是之前频繁出现的高亮 bug 的真正根因，**不是布局 weight 的问题，而是代码多余的高亮机制**。
+3. 列表 / 菜单里的**条目**用 `bg_nokia_selected` / `bg_nokia_selected_dark` 高亮是合理的（方向键导航选中某个应用 / 选项，属于需求"所有可选项可被方向键选中并高亮"）。**本规范只针对软键栏（底部左右菜单），不针对列表项。**
+
+正确做法（弹窗 / 软键栏）：
+
+- **彻底删掉**软键栏上的 `focusIndex` / `setFocus()` / `applyFocus()` 这套焦点状态，以及任何 `setBackgroundResource(R.drawable.bg_nokia_selected)` 给软键设置背景的代码。**软键不需要高亮。**
+- **按键语义回归真机**：
+  - 左软键（`ACTION_SOFT_LEFT`）→ 触发左文字动作。
+  - 右软键（`ACTION_SOFT_RIGHT`）→ 触发右文字动作。
+  - 中间确认键（`ACTION_SELECT` / `DPAD_CENTER` / `ENTER`）→ **只确认"内容区"的选中项，绝不等于左或右软键**；弹窗里若没有列表项可确认，确认键不触发任何软键（消费掉即可），不可把确认键当成切换 / 触发左右菜单。
+  - 方向键左 / 右（`ACTION_LEFT` / `ACTION_RIGHT`）→ 软键没有"焦点"概念，不要再用来切换焦点，直接忽略。
+  - 返回键（`BACK`）→ 保留（安装完成→完成、卸载→取消）。
+- 删除 `showXxxUi()` 里类似 `focusIndex = 1; applyFocus();` 这种调用。
+- 布局 `0dp + weight=1` 可以保留（左右各 50% 没问题），因为没有背景去撑满它，左右文字会各自靠左 / 靠右静默显示，符合诺基亚观感。
+
+已有反例 / 待修清单（新增或修改弹窗时对照自查）：
+
+- `NokiaInstallerDialog.java`：曾用 `applyFocus()` 给 `softLeft` / `softRight` 设置 `bg_nokia_selected`，并用 `DPAD_LEFT` / `DPAD_RIGHT` 切焦点、`DPAD_CENTER` 触发 `trigger(focusIndex)` —— 这套全部应删除。
+- `NokiaUninstallDialog.java`：同样的 `applyFocus()` 高亮 + 焦点切换逻辑 —— 同样应删除。
+- 凡是底部只有左右两个软键的弹窗，一律照此处理，不要再写回高亮 / 焦点代码。
+
 
 ## Android 4.4 (API 19) 兼容性踩坑
 
