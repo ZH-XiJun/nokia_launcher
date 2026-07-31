@@ -32,6 +32,7 @@ import ru.playsoftware.j2meloader.applist.AppListModel;
 import ru.playsoftware.j2meloader.appsdb.AppRepository;
 import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.filepicker.FilteredFilePickerFragment;
+import ru.playsoftware.j2meloader.util.AppUtils;
 import ru.playsoftware.j2meloader.util.Constants;
 import ru.playsoftware.j2meloader.util.FileUtils;
 import ru.woesss.j2me.installer.InstallerDialog;
@@ -50,6 +51,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 
 	private static final int SUBMENU_LAUNCH = 0;
 	private static final int SUBMENU_SETTINGS = 1;
+	private static final int SUBMENU_UNINSTALL = 2;
 
 	// ---- 网格常量 ----
 	private static final int COLS = 3;
@@ -324,7 +326,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 		mode = MODE_SUBMENU;
 
 		appContainer.removeAllViews();
-		subMenuItemViews = new View[2];
+		subMenuItemViews = new View[3];
 		subFocusIndex = -1;
 		gridCellViews = null;
 
@@ -346,6 +348,11 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 		// 创建"设置"行
 		LinearLayout rowSettings = createSubMenuItem("设置", R.drawable.s60_settings, SUBMENU_SETTINGS);
 		appContainer.addView(rowSettings);
+
+		// 创建"卸载"行
+		LinearLayout rowUninstall = createSubMenuItem("卸载",
+				android.R.drawable.ic_menu_delete, SUBMENU_UNINSTALL);
+		appContainer.addView(rowUninstall);
 
 		// 默认焦点在"启动"
 		setSubFocusIndex(0);
@@ -644,9 +651,38 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 				Config.startApp(requireContext(), selectedAppItem.getTitle(),
 						selectedAppItem.getPathExt(), true);
 				return true;
+			case SUBMENU_UNINSTALL:
+				NokiaLog.i("Box", "卸载菜单: " + selectedAppItem.getTitle());
+				showUninstallDialog();
+				return true;
 			default:
 				return false;
 		}
+	}
+
+	/**
+	 * 弹出诺基亚风格卸载确认弹窗。弹窗只接收应用名用于展示，
+	 * 实际删除逻辑通过 {@link NokiaUninstallDialog.ConfirmListener} 回调执行，
+	 * 避免向 Dialog 传递非 Parcelable 的 AppItem。
+	 */
+	private void showUninstallDialog() {
+		if (selectedAppItem == null) {
+			NokiaLog.w("Box", "showUninstallDialog: selectedAppItem 为 null，忽略");
+			return;
+		}
+		NokiaLog.i("Box", "弹出卸载确认弹窗: " + selectedAppItem.getTitle());
+		NokiaUninstallDialog dialog = NokiaUninstallDialog.newInstance(selectedAppItem.getTitle());
+		dialog.setConfirmListener(() -> doUninstall(selectedAppItem));
+		dialog.show(getParentFragmentManager(), "uninstall");
+	}
+
+	/** 执行卸载：删除应用目录/存档/图标 + 数据库记录，随后退出子菜单回到网格 */
+	private void doUninstall(AppItem app) {
+		if (app == null) return;
+		NokiaLog.i("Box", "执行卸载: " + app.getTitle());
+		AppUtils.deleteApp(app);
+		appRepository.delete(app);
+		exitSubMenu();
 	}
 
 	// ============================
