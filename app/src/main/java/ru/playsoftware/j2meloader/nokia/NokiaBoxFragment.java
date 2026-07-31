@@ -39,19 +39,11 @@ import ru.woesss.j2me.installer.NokiaInstallerDialog;
 
 /**
  * 应用程序中间内容碎片。
- * 双模式：网格模式展示"安装jar"入口 + 已装 JAR 应用网格；
- * 次级菜单模式展示"启动"/"设置"两个选项。
- * 通过方向键导航，确认键交互，复用 J2ME-Loader 原有的安装与启动逻辑。
+ * 网格模式展示"安装jar"入口 + JAR全局设置 + 已装 JAR 应用网格。
+ * 确认键直接启动应用，左软键弹出选项菜单（启动/设置/卸载）。
+ * 方向键导航，复用 J2ME-Loader 原有的安装与启动逻辑。
  */
 public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
-
-	// ---- 模式常量 ----
-	private static final int MODE_GRID = 0;
-	private static final int MODE_SUBMENU = 1;
-
-	private static final int SUBMENU_LAUNCH = 0;
-	private static final int SUBMENU_SETTINGS = 1;
-	private static final int SUBMENU_UNINSTALL = 2;
 
 	// ---- 网格常量 ----
 	private static final int COLS = 3;
@@ -71,11 +63,6 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	private int focusIndex = -1;
 	private View selectedView = null;
 
-	// ---- 次级菜单 ----
-	private View[] subMenuItemViews;
-	private AppItem selectedAppItem;
-	private int subFocusIndex = -1;
-
 	// ---- 数据 ----
 	private AppRepository appRepository;
 	private List<AppItem> appItems = new ArrayList<>();
@@ -83,9 +70,6 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 
 	// ---- 文件选择器 ----
 	private ActivityResultLauncher<String> openFileLauncher;
-
-	// ---- 当前模式 ----
-	private int mode = MODE_GRID;
 
 	// ============================
 	// 生命周期
@@ -128,7 +112,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 		if (title != null) {
 			title.setText("应用程序");
 		}
-		host.setBottomBar("选择", null, "退出");
+		host.setBottomBar("选项", null, "退出");
 
 		appScroll = view.findViewById(R.id.appScroll);
 		appContainer = view.findViewById(R.id.appContainer);
@@ -171,13 +155,11 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	private void onDbUpdated(List<AppItem> items) {
 		NokiaLog.i("Box", "onDbUpdated 收到 " + (items != null ? items.size() : 0) + " 个应用");
 		appItems = items != null ? items : new ArrayList<>();
-		if (mode == MODE_GRID) {
-			buildGrid();
-		}
+		buildGrid();
 	}
 
 	// ============================
-	// 构建网格模式
+	// 构建网格
 	// ============================
 
 	private void buildGrid() {
@@ -186,7 +168,6 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 		totalGridCells = 2 + appItems.size(); // 安装 + JAR 全局设置 + 已装应用
 		int totalRows = (int) Math.ceil((double) totalGridCells / COLS);
 		gridCellViews = new View[totalGridCells];
-		subMenuItemViews = null;
 
 		NokiaLog.i("Box", "buildGrid: totalCells=" + totalGridCells
 				+ " rows=" + totalRows + " apps=" + appItems.size());
@@ -318,103 +299,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	}
 
 	// ============================
-	// 构建次级菜单模式
-	// ============================
-
-	private void enterSubMenu(AppItem app) {
-		selectedAppItem = app;
-		mode = MODE_SUBMENU;
-
-		appContainer.removeAllViews();
-		subMenuItemViews = new View[3];
-		subFocusIndex = -1;
-		gridCellViews = null;
-
-		NokiaLog.i("Box", "enterSubMenu: " + app.getTitle());
-
-		// 更新标题为应用名
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText(app.getTitle());
-		}
-		// 软键：左"选择"、右"返回"
-		host.setBottomBar("选择", null, "返回");
-
-		// 创建"启动"行
-		LinearLayout rowLaunch = createSubMenuItem("启动", R.drawable.s60_app, SUBMENU_LAUNCH);
-		appContainer.addView(rowLaunch);
-
-		// 创建"设置"行
-		LinearLayout rowSettings = createSubMenuItem("设置", R.drawable.s60_settings, SUBMENU_SETTINGS);
-		appContainer.addView(rowSettings);
-
-		// 创建"卸载"行
-		LinearLayout rowUninstall = createSubMenuItem("卸载",
-				android.R.drawable.ic_menu_delete, SUBMENU_UNINSTALL);
-		appContainer.addView(rowUninstall);
-
-		// 默认焦点在"启动"
-		setSubFocusIndex(0);
-	}
-
-	private LinearLayout createSubMenuItem(String label, int iconRes, int index) {
-		LinearLayout row = new LinearLayout(requireContext());
-		row.setOrientation(LinearLayout.HORIZONTAL);
-		row.setGravity(Gravity.CENTER_VERTICAL);
-		row.setLayoutParams(new LinearLayout.LayoutParams(
-				LinearLayout.LayoutParams.MATCH_PARENT, dp(40)));
-		row.setPadding(dp(14), dp(6), dp(14), dp(6));
-		row.setClickable(true);
-
-		ImageView ivIcon = new ImageView(requireContext());
-		ivIcon.setLayoutParams(new LinearLayout.LayoutParams(dp(24), dp(24)));
-		try {
-			ivIcon.setImageDrawable(ContextCompat.getDrawable(requireContext(), iconRes));
-		} catch (Exception ignored) {}
-		row.addView(ivIcon);
-
-		row.addView(spaceView(dp(10), 1));
-
-		TextView tvName = new TextView(requireContext());
-		tvName.setLayoutParams(new LinearLayout.LayoutParams(
-				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-		tvName.setText(label);
-		tvName.setTextColor(0xFFFFFFFF);
-		tvName.setTextSize(12);
-		row.addView(tvName);
-
-		final int fIdx = index;
-		row.setOnClickListener(v -> {
-			setSubFocusIndex(fIdx);
-			onSelectSubMenu();
-		});
-
-		subMenuItemViews[index] = row;
-		return row;
-	}
-
-	private void exitSubMenu() {
-		NokiaLog.i("Box", "exitSubMenu 回到网格");
-		mode = MODE_GRID;
-		selectedAppItem = null;
-		subMenuItemViews = null;
-		subFocusIndex = -1;
-		focusIndex = -1;
-
-		// 恢复标题和软键
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("应用程序");
-		}
-		host.setBottomBar("选择", null, "退出");
-
-		buildGrid();
-	}
-
-	// ============================
-	// 焦点管理 —— 网格模式
+	// 焦点管理
 	// ============================
 
 	private void setFocusIndex(int index) {
@@ -438,6 +323,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 			gridCellViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
 			selectedView = gridCellViews[focusIndex];
 		}
+		updateSoftKeys();
 	}
 
 	private void scrollToVisibleGrid(int index) {
@@ -457,32 +343,6 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 				appScroll.smoothScrollTo(0, itemBottom - svHeight);
 			}
 		});
-	}
-
-	// ============================
-	// 焦点管理 —— 次级菜单
-	// ============================
-
-	private void setSubFocusIndex(int index) {
-		if (subMenuItemViews == null || index < 0 || index >= subMenuItemViews.length) return;
-		clearSubFocus();
-		subFocusIndex = index;
-		applySubFocus();
-	}
-
-	private void clearSubFocus() {
-		if (selectedView != null) {
-			selectedView.setBackgroundResource(0);
-			selectedView = null;
-		}
-	}
-
-	private void applySubFocus() {
-		if (subFocusIndex >= 0 && subFocusIndex < subMenuItemViews.length
-				&& subMenuItemViews[subFocusIndex] != null) {
-			subMenuItemViews[subFocusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
-			selectedView = subMenuItemViews[subFocusIndex];
-		}
 	}
 
 	// ============================
@@ -523,8 +383,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onDirection(int direction) {
-		if (mode == MODE_GRID) return onDirectionGrid(direction);
-		else return onDirectionSubMenu(direction);
+		return onDirectionGrid(direction);
 	}
 
 	private boolean onDirectionGrid(int direction) {
@@ -578,42 +437,16 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 		return true;
 	}
 
-	private boolean onDirectionSubMenu(int direction) {
-		if (subMenuItemViews == null) return false;
-		if (subFocusIndex < 0) {
-			setSubFocusIndex(0);
-			return true;
-		}
-		switch (direction) {
-			case NokiaKeyBinding.ACTION_UP:
-				if (subFocusIndex > 0) setSubFocusIndex(subFocusIndex - 1);
-				return true;
-			case NokiaKeyBinding.ACTION_DOWN:
-				if (subFocusIndex < subMenuItemViews.length - 1) setSubFocusIndex(subFocusIndex + 1);
-				return true;
-			case NokiaKeyBinding.ACTION_LEFT:
-			case NokiaKeyBinding.ACTION_RIGHT:
-				return true; // 次级菜单不响应左右
-			default:
-				return false;
-		}
-	}
-
 	// ============================
 	// NokiaFocusHost —— 确认键
 	// ============================
 
 	@Override
 	public boolean onSelect() {
-		if (mode == MODE_GRID) return onSelectGrid();
-		else return onSelectSubMenu();
-	}
-
-	private boolean onSelectGrid() {
 		if (focusIndex < 0 || totalGridCells == 0) return false;
 
 		if (focusIndex == 0) {
-			// 安装
+			// 安装入口
 			NokiaLog.i("Box", "onSelect: 安装");
 			launchFilePicker();
 			return true;
@@ -625,64 +458,91 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 			return true;
 		}
 
-		// JAR 应用 → 进入次级菜单
+		// JAR 应用 → 直接启动
 		int appIdx = focusIndex - 2;
 		if (appIdx >= 0 && appIdx < appItems.size()) {
 			AppItem app = appItems.get(appIdx);
-			NokiaLog.i("Box", "onSelect: 进入次级菜单 " + app.getTitle());
-			enterSubMenu(app);
+			NokiaLog.i("Box", "onSelect: 直接启动 " + app.getTitle());
+			Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
 			return true;
 		}
 		return false;
 	}
 
-	private boolean onSelectSubMenu() {
-		if (subFocusIndex < 0 || selectedAppItem == null) return false;
-		NokiaLog.i("Box", "onSelectSubMenu: idx=" + subFocusIndex + " app=" + selectedAppItem.getTitle());
+	// ============================
+	// 选项菜单（左软键弹出）
+	// ============================
 
-		switch (subFocusIndex) {
-			case SUBMENU_LAUNCH:
-				NokiaLog.i("Box", "启动应用: " + selectedAppItem.getTitle());
-				Config.startApp(requireContext(), selectedAppItem.getTitle(),
-						selectedAppItem.getPathExt(), false);
-				return true;
-			case SUBMENU_SETTINGS:
-				NokiaLog.i("Box", "应用设置: " + selectedAppItem.getTitle());
-				Config.startApp(requireContext(), selectedAppItem.getTitle(),
-						selectedAppItem.getPathExt(), true);
-				return true;
-			case SUBMENU_UNINSTALL:
-				NokiaLog.i("Box", "卸载菜单: " + selectedAppItem.getTitle());
-				showUninstallDialog();
-				return true;
-			default:
-				return false;
-		}
+	/**
+	 * 弹出诺基亚风格选项菜单弹窗（启动/设置/卸载）。
+	 */
+	private void showAppOptionsMenu(AppItem app) {
+		NokiaLog.i("Box", "弹出选项菜单: " + app.getTitle());
+		NokiaAppOptionsDialog dialog = NokiaAppOptionsDialog.newInstance(app.getTitle());
+		dialog.setOptionsListener(new NokiaAppOptionsDialog.OptionsListener() {
+			@Override
+			public void onLaunch() {
+				NokiaLog.i("Box", "选项菜单-启动: " + app.getTitle());
+				Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
+			}
+			@Override
+			public void onSettings() {
+				NokiaLog.i("Box", "选项菜单-设置: " + app.getTitle());
+				Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), true);
+			}
+			@Override
+			public void onUninstall() {
+				NokiaLog.i("Box", "选项菜单-卸载: " + app.getTitle());
+				showUninstallDialog(app);
+			}
+		});
+		dialog.show(getParentFragmentManager(), "app_options");
 	}
+
+	// ============================
+	// 卸载
+	// ============================
 
 	/**
 	 * 弹出诺基亚风格卸载确认弹窗。弹窗只接收应用名用于展示，
-	 * 实际删除逻辑通过 {@link NokiaUninstallDialog.ConfirmListener} 回调执行，
-	 * 避免向 Dialog 传递非 Parcelable 的 AppItem。
+	 * 实际删除逻辑通过 {@link NokiaUninstallDialog.ConfirmListener} 回调执行。
 	 */
-	private void showUninstallDialog() {
-		if (selectedAppItem == null) {
-			NokiaLog.w("Box", "showUninstallDialog: selectedAppItem 为 null，忽略");
+	private void showUninstallDialog(AppItem app) {
+		if (app == null) {
+			NokiaLog.w("Box", "showUninstallDialog: app 为 null，忽略");
 			return;
 		}
-		NokiaLog.i("Box", "弹出卸载确认弹窗: " + selectedAppItem.getTitle());
-		NokiaUninstallDialog dialog = NokiaUninstallDialog.newInstance(selectedAppItem.getTitle());
-		dialog.setConfirmListener(() -> doUninstall(selectedAppItem));
+		NokiaLog.i("Box", "弹出卸载确认弹窗: " + app.getTitle());
+		NokiaUninstallDialog dialog = NokiaUninstallDialog.newInstance(app.getTitle());
+		dialog.setConfirmListener(() -> doUninstall(app));
 		dialog.show(getParentFragmentManager(), "uninstall");
 	}
 
-	/** 执行卸载：删除应用目录/存档/图标 + 数据库记录，随后退出子菜单回到网格 */
+	/** 执行卸载：删除应用目录/存档/图标 + 数据库记录，数据库变更会触发 onDbUpdated 自动重建网格 */
 	private void doUninstall(AppItem app) {
 		if (app == null) return;
 		NokiaLog.i("Box", "执行卸载: " + app.getTitle());
 		AppUtils.deleteApp(app);
 		appRepository.delete(app);
-		exitSubMenu();
+	}
+
+	// ============================
+	// 软键文字更新
+	// ============================
+
+	/**
+	 * 根据当前焦点动态更新底部软键文字。
+	 * 选中"安装"或"JAR全局设置"时，左软键文字隐藏；选中 JAR 应用时显示"选项"。
+	 */
+	private void updateSoftKeys() {
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		if (focusIndex >= 2) {
+			// JAR 应用 → 左软键显示"选项"
+			host.setBottomBar("选项", null, "退出");
+		} else {
+			// 安装 / JAR全局设置 → 左软键文字隐藏
+			host.setBottomBar(null, null, "退出");
+		}
 	}
 
 	// ============================
@@ -691,26 +551,27 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 
 	@Override
 	public boolean onSoftLeft() {
-		if (mode == MODE_GRID) return onSelectGrid();
-		else return onSelectSubMenu();
+		// JAR 应用（focusIndex >= 2）→ 选项菜单
+		if (focusIndex >= 2) {
+			int appIdx = focusIndex - 2;
+			if (appIdx >= 0 && appIdx < appItems.size()) {
+				AppItem app = appItems.get(appIdx);
+				showAppOptionsMenu(app);
+				return true;
+			}
+		}
+		// 安装 / JAR全局设置 → 左软键无反应
+		return false;
 	}
 
 	@Override
 	public boolean onSoftRight() {
-		if (mode == MODE_SUBMENU) {
-			exitSubMenu();
-		} else {
-			((NokiaDesktopActivity) requireActivity()).exitCurrent();
-		}
+		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}
 
 	@Override
 	public boolean onBack() {
-		if (mode == MODE_SUBMENU) {
-			exitSubMenu();
-			return true;
-		}
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}

@@ -1,0 +1,1212 @@
+# 诺基亚风格应用程序界面重构设计
+
+> 版本：v1.0  
+> 日期：2026-07-31  
+> 状态：待审核
+
+---
+
+## 一、需求概述
+
+### 1.1 背景
+
+当前诺基亚桌面的「应用程序」界面（`NokiaBoxFragment`）在选中 JAR 应用后按下确认键，会进入次级菜单页面（显示"启动"/"设置"/"卸载"三个选项）。这与真实诺基亚手机的交互习惯不符：
+
+- **真机行为**：确认键直接打开应用，左软键（"选项"）弹出操作菜单
+- **当前行为**：确认键进入菜单页，需要再选一次"启动"
+
+### 1.2 目标
+
+- **确认键**：选中 JAR 应用后直接启动，不再弹出中间页面
+- **左软键**：弹出选项菜单（启动/设置/卸载），保持诺基亚"选项"键习惯
+- **删除次级菜单页面**：用弹窗替代全屏页面切换
+- **简化代码**：删除 `MODE_SUBMENU` 双模式逻辑
+
+### 1.3 非目标
+
+- 不改变安装入口和 JAR 全局设置入口的行为
+- 不改变方向键导航逻辑
+- 不改变卸载弹窗的 UI 和交互
+
+---
+
+## 二、现有代码分析
+
+### 2.1 当前交互流程
+
+```
+用户选中 JAR 应用（如"手机QQ2008"）
+    │
+    ├── 按下确认键 ──────────────┐
+    │                           ▼
+    │              ┌─────────────────────┐
+    │              │ 次级菜单页面（全屏）   │
+    │              │ 标题：手机QQ2008      │
+    │              │ 选项：启动           │
+    │              │       设置           │
+    │              │       卸载           │
+    │              │ 软键：左=选择 右=返回 │
+    │              └─────────────────────┘
+    │                           │
+    │              用户选择"启动" → 启动应用
+    │
+    └── 按下左软键 ────────────► 等效确认键（同上）
+```
+
+### 2.2 当前代码结构
+
+```java
+public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
+    // 双模式
+    private static final int MODE_GRID = 0;
+    private static final int MODE_SUBMENU = 1;  // ← 需要删除
+    private int mode = MODE_GRID;
+    
+    // 次级菜单相关
+    private View[] subMenuItemViews;     // ← 需要删除
+    private AppItem selectedAppItem;     // ← 需要删除
+    private int subFocusIndex = -1;      // ← 需要删除
+    
+    // 方法
+    private void enterSubMenu(AppItem app) { ... }      // ← 需要删除
+    private void exitSubMenu() { ... }                  // ← 需要删除
+    private LinearLayout createSubMenuItem(...) { ... } // ← 需要删除
+    private boolean onDirectionSubMenu(int direction) { ... } // ← 需要删除
+    private boolean onSelectSubMenu() { ... }           // ← 需要删除
+}
+```
+
+### 2.3 需要删除的代码清单
+
+| 类型 | 名称 | 说明 |
+|---|---|---|
+| 常量 | `MODE_SUBMENU` | 次级菜单模式标识 |
+| 常量 | `SUBMENU_LAUNCH` | 次级菜单-启动索引 |
+| 常量 | `SUBMENU_SETTINGS` | 次级菜单-设置索引 |
+| 常量 | `SUBMENU_UNINSTALL` | 次级菜单-卸载索引 |
+| 字段 | `subMenuItemViews` | 次级菜单视图数组 |
+| 字段 | `selectedAppItem` | 当前选中应用（次级菜单用） |
+| 字段 | `subFocusIndex` | 次级菜单焦点索引 |
+| 字段 | `mode` | 当前模式（不再需要双模式） |
+| 方法 | `enterSubMenu()` | 进入次级菜单 |
+| 方法 | `exitSubMenu()` | 退出次级菜单 |
+| 方法 | `createSubMenuItem()` | 创建次级菜单项 |
+| 方法 | `onDirectionSubMenu()` | 次级菜单方向键处理 |
+| 方法 | `onSelectSubMenu()` | 次级菜单确认键处理 |
+
+---
+
+## 三、设计方案
+
+### 3.1 总体架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    NokiaBoxFragment                          │
+│                    （单模式：仅网格）                         │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 网格模式：安装 / JAR全局设置 / 已安装JAR应用网格      │   │
+│  │                                                     │   │
+│  │ 确认键：                                             │   │
+│  │   - 安装入口 → 启动文件选择器                        │   │
+│  │   - 设置入口 → 打开全局设置                          │   │
+│  │   - JAR应用 → 直接启动应用（Config.startApp）        │   │
+│  │                                                     │   │
+│  │ 左软键：                                             │   │
+│  │   - JAR应用 → 弹出 NokiaAppOptionsDialog            │   │
+│  │   - 其他 → 等效确认键                               │   │
+│  │                                                     │   │
+│  │ 右软键 → 退出                                       │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                          │                                  │
+│                          ▼                                  │
+│              ┌─────────────────────┐                        │
+│              │ NokiaAppOptionsDialog│                        │
+│              │ 选项菜单弹窗          │                        │
+│              │ 启动 / 设置 / 卸载    │                        │
+│              └─────────────────────┘                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 按键行为对照表
+
+#### 网格界面（应用程序列表）
+
+| 按键 | 当前行为 | 新行为 | 适用对象 |
+|---|---|---|---|
+| 方向键 | 导航网格 | 不变 | 所有格子 |
+| 确认键 | 进入次级菜单 | **直接启动应用** | JAR 应用 |
+| 确认键 | 进入次级菜单 | 启动文件选择器 | 安装入口 |
+| 确认键 | 进入次级菜单 | 打开全局设置 | 设置入口 |
+| 左软键 | 等效确认键 | **弹出选项菜单** | JAR 应用 |
+| 左软键 | 等效确认键 | 等效确认键 | 安装/设置入口 |
+| 右软键 | 退出 | 不变 | 所有 |
+| 返回键 | 退出 | 不变 | 所有 |
+
+#### 选项菜单弹窗（`NokiaAppOptionsDialog`）
+
+| 按键 | 行为 |
+|---|---|
+| 方向上 | 高亮上一个选项 |
+| 方向下 | 高亮下一个选项 |
+| 确认键 | 触发当前高亮选项 |
+| 左软键 | 关闭弹窗（等效返回） |
+| 右软键 | 关闭弹窗（等效返回） |
+| 返回键 | 关闭弹窗 |
+
+---
+
+## 四、详细路径与操作逻辑
+
+### 4.1 主路径：选中 JAR 应用 → 确认键直接启动
+
+```
+用户操作                          系统响应
+─────────                        ─────────
+  │                                  │
+  │  方向键选中"手机QQ2008"           │
+  ▼                                  │
+┌─────────────────────────────────────────┐
+│  网格界面，"手机QQ2008"高亮          │
+│  底部软键：左=选项  右=退出           │
+└─────────────────────────────────────────┘
+       │                            │
+       │ 按下确认键                  │
+       ▼                            ▼
+  ┌─────────────────────────────────────────┐
+  │  直接调用 Config.startApp(...)         │
+  │  启动 J2ME 应用                         │
+  └─────────────────────────────────────────┘
+```
+
+### 4.2 选项路径：选中 JAR 应用 → 左软键弹出菜单
+
+```
+用户操作                          系统响应
+─────────                        ─────────
+  │                                  │
+  │  方向键选中"手机QQ2008"           │
+  ▼                                  │
+┌─────────────────────────────────────────┐
+│  网格界面，"手机QQ2008"高亮          │
+│  底部软键：左=选项  右=退出           │
+└─────────────────────────────────────────┘
+       │                            │
+       │ 按下左软键（选项）           │
+       ▼                            ▼
+┌─────────────────────────────────────────┐
+│  弹出 NokiaAppOptionsDialog            │
+│  标题：手机QQ2008                      │
+│  选项：                                │
+│    ▶ 启动  ← 默认高亮                 │
+│      设置                              │
+│      卸载                              │
+│  软键：左=选择  右=返回               │
+└─────────────────────────────────────────┘
+       │                            │
+       ├─ 方向键下 → 高亮"设置" ───┤
+       │                            │
+       ├─ 确认键 → 打开设置 ────────┤
+       │                            ▼
+       │                    Config.startApp(..., true)
+       │
+       └─ 右软键/返回键 → 关闭弹窗 ─┤
+                                    ▼
+                            回到网格界面
+```
+
+### 4.3 选项菜单各选项行为
+
+| 选项 | 触发行为 | 后续 |
+|---|---|---|
+| 启动 | `Config.startApp(context, title, path, false)` | 关闭弹窗，启动应用 |
+| 设置 | `Config.startApp(context, title, path, true)` | 关闭弹窗，打开设置页 |
+| 卸载 | 弹出 `NokiaUninstallDialog` | 确认后删除应用，刷新网格 |
+
+---
+
+## 五、核心代码设计
+
+### 5.1 文件清单
+
+#### 5.1.1 新增文件
+
+| 文件 | 类型 | 说明 |
+|---|---|---|
+| `NokiaAppOptionsDialog.java` | Java | 选项菜单弹窗（启动/设置/卸载） |
+| `dialog_nokia_app_options.xml` | Layout | 选项菜单弹窗布局 |
+
+#### 5.1.2 修改文件
+
+| 文件 | 修改内容 |
+|---|---|
+| `NokiaBoxFragment.java` | 删除次级菜单模式，修改确认键和左软键行为 |
+
+#### 5.1.3 不动文件
+
+| 文件 | 原因 |
+|---|---|
+| `NokiaUninstallDialog.java` | 卸载弹窗复用，行为不变 |
+| `dialog_nokia_uninstall.xml` | 卸载弹窗布局不变 |
+| `NokiaInstallerDialog.java` | 安装弹窗独立，不受影响 |
+
+---
+
+### 5.2 NokiaBoxFragment 修改详解
+
+#### 5.2.1 删除字段和常量
+
+```java
+// ===== 删除以下代码 =====
+
+// 模式常量
+// private static final int MODE_SUBMENU = 1;
+// private static final int SUBMENU_LAUNCH = 0;
+// private static final int SUBMENU_SETTINGS = 1;
+// private static final int SUBMENU_UNINSTALL = 2;
+
+// 次级菜单相关字段
+// private View[] subMenuItemViews;
+// private AppItem selectedAppItem;
+// private int subFocusIndex = -1;
+// private int mode = MODE_GRID;
+```
+
+#### 5.2.2 修改 onSelect()（确认键）
+
+```java
+@Override
+public boolean onSelect() {
+    if (focusIndex < 0 || totalGridCells == 0) return false;
+
+    if (focusIndex == 0) {
+        // 安装入口
+        NokiaLog.i("Box", "onSelect: 安装");
+        launchFilePicker();
+        return true;
+    }
+    if (focusIndex == 1) {
+        // JAR 全局设置
+        NokiaLog.i("Box", "onSelect: JAR 全局设置");
+        NokiaGlobalProfile.openGlobalSettings(requireContext());
+        return true;
+    }
+
+    // ===== 修改：JAR 应用直接启动，不再进入次级菜单 =====
+    int appIdx = focusIndex - 2;
+    if (appIdx >= 0 && appIdx < appItems.size()) {
+        AppItem app = appItems.get(appIdx);
+        NokiaLog.i("Box", "onSelect: 直接启动 " + app.getTitle());
+        Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
+        return true;
+    }
+    return false;
+}
+```
+
+#### 5.2.3 修改 onSoftLeft()（左软键）
+
+```java
+@Override
+public boolean onSoftLeft() {
+    // ===== 修改：左软键 = 选项菜单（仅对 JAR 应用） =====
+    if (focusIndex >= 2) {
+        int appIdx = focusIndex - 2;
+        if (appIdx >= 0 && appIdx < appItems.size()) {
+            AppItem app = appItems.get(appIdx);
+            NokiaLog.i("Box", "onSoftLeft: 弹出选项菜单 " + app.getTitle());
+            showAppOptionsMenu(app);
+            return true;
+        }
+    }
+    // 安装入口和设置入口保持原行为（等效确认键）
+    return onSelect();
+}
+```
+
+#### 5.2.4 新增 showAppOptionsMenu()
+
+```java
+/**
+ * 弹出应用选项菜单弹窗。
+ * 显示"启动"/"设置"/"卸载"三个选项。
+ */
+private void showAppOptionsMenu(AppItem app) {
+    NokiaAppOptionsDialog dialog = NokiaAppOptionsDialog.newInstance(app.getTitle());
+    dialog.setOptionsListener(new NokiaAppOptionsDialog.OptionsListener() {
+        @Override
+        public void onLaunch() {
+            NokiaLog.i("Box", "选项菜单-启动: " + app.getTitle());
+            Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
+        }
+        @Override
+        public void onSettings() {
+            NokiaLog.i("Box", "选项菜单-设置: " + app.getTitle());
+            Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), true);
+        }
+        @Override
+        public void onUninstall() {
+            NokiaLog.i("Box", "选项菜单-卸载: " + app.getTitle());
+            showUninstallDialog(app);
+        }
+    });
+    dialog.show(getParentFragmentManager(), "app_options");
+}
+```
+
+#### 5.2.5 修改 showUninstallDialog()（参数化）
+
+```java
+// 修改前：依赖 selectedAppItem 字段
+// private void showUninstallDialog() {
+//     if (selectedAppItem == null) return;
+//     ...
+// }
+
+// 修改后：接收 AppItem 参数
+private void showUninstallDialog(AppItem app) {
+    if (app == null) {
+        NokiaLog.w("Box", "showUninstallDialog: app 为 null，忽略");
+        return;
+    }
+    NokiaLog.i("Box", "弹出卸载确认弹窗: " + app.getTitle());
+    NokiaUninstallDialog dialog = NokiaUninstallDialog.newInstance(app.getTitle());
+    dialog.setConfirmListener(() -> doUninstall(app));
+    dialog.show(getParentFragmentManager(), "uninstall");
+}
+```
+
+#### 5.2.6 修改 doUninstall()（参数化）
+
+```java
+// 修改前：依赖 selectedAppItem 字段
+// private void doUninstall() {
+//     if (selectedAppItem == null) return;
+//     AppUtils.deleteApp(selectedAppItem);
+//     appRepository.delete(selectedAppItem);
+//     exitSubMenu();
+// }
+
+// 修改后：接收 AppItem 参数，直接刷新网格
+private void doUninstall(AppItem app) {
+    if (app == null) return;
+    NokiaLog.i("Box", "执行卸载: " + app.getTitle());
+    AppUtils.deleteApp(app);
+    appRepository.delete(app);
+    // 不再需要 exitSubMenu()，直接刷新网格
+    // 数据库变更会触发 onDbUpdated() 自动重建网格
+}
+```
+
+#### 5.2.7 修改 onBack() 和 onSoftRight()
+
+```java
+@Override
+public boolean onSoftRight() {
+    // 删除 MODE_SUBMENU 判断，只剩退出
+    ((NokiaDesktopActivity) requireActivity()).exitCurrent();
+    return true;
+}
+
+@Override
+public boolean onBack() {
+    // 删除 MODE_SUBMENU 判断，只剩退出
+    ((NokiaDesktopActivity) requireActivity()).exitCurrent();
+    return true;
+}
+```
+
+#### 5.2.8 修改 onDirection()
+
+```java
+@Override
+public boolean onDirection(int direction) {
+    // 删除 MODE_SUBMENU 分支判断
+    return onDirectionGrid(direction);
+}
+```
+
+#### 5.2.9 修改底部软键文字
+
+```java
+// 在 onViewCreated() 中
+host.setBottomBar("选项", null, "退出");  // 左软键从"选择"改为"选项"
+
+// 删除 enterSubMenu() 中的 setBottomBar("选择", null, "返回")
+```
+
+---
+
+### 5.3 NokiaAppOptionsDialog 完整代码
+
+```java
+package ru.playsoftware.j2meloader.nokia;
+
+import android.app.Dialog;
+import android.os.Bundle;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.DialogFragment;
+
+import ru.playsoftware.j2meloader.R;
+
+/**
+ * 诺基亚风格应用选项菜单弹窗。
+ *
+ * 显示"启动"/"设置"/"卸载"三个选项，方向键上下导航，确认键触发，
+ * 左/右软键或返回键关闭弹窗。
+ *
+ * 按键规范：
+ * - 接入 NokiaKeyBinding，禁止写死 keyCode
+ * - 软键栏无高亮/焦点逻辑（只显示文字标签）
+ * - 内容区选项使用 bg_nokia_selected_dark 高亮
+ */
+public class NokiaAppOptionsDialog extends DialogFragment {
+    private static final String TAG = "AppOptions";
+    private static final String ARG_NAME = "app_name";
+
+    private static final int OPTION_LAUNCH = 0;
+    private static final int OPTION_SETTINGS = 1;
+    private static final int OPTION_UNINSTALL = 2;
+    private static final int OPTION_COUNT = 3;
+
+    private final LinearLayout[] optionRows = new LinearLayout[OPTION_COUNT];
+    private int focusIndex = 0;
+    private OptionsListener listener;
+
+    public interface OptionsListener {
+        void onLaunch();
+        void onSettings();
+        void onUninstall();
+    }
+
+    public static NokiaAppOptionsDialog newInstance(String appName) {
+        NokiaAppOptionsDialog dialog = new NokiaAppOptionsDialog();
+        Bundle args = new Bundle();
+        args.putString(ARG_NAME, appName);
+        dialog.setArguments(args);
+        return dialog;
+    }
+
+    public void setOptionsListener(OptionsListener listener) {
+        this.listener = listener;
+    }
+
+    @NonNull
+    @Override
+    public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
+        NokiaLog.i(TAG, "onCreateDialog: 创建选项菜单");
+        Dialog dialog = new Dialog(requireActivity());
+        dialog.setContentView(R.layout.dialog_nokia_app_options);
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        String appName = requireArguments().getString(ARG_NAME, "");
+        TextView title = dialog.findViewById(R.id.options_title);
+        if (title != null) title.setText(appName);
+
+        // 绑定选项行
+        optionRows[OPTION_LAUNCH] = dialog.findViewById(R.id.option_launch);
+        optionRows[OPTION_SETTINGS] = dialog.findViewById(R.id.option_settings);
+        optionRows[OPTION_UNINSTALL] = dialog.findViewById(R.id.option_uninstall);
+
+        // 触摸支持：点击即触发
+        for (int i = 0; i < OPTION_COUNT; i++) {
+            final int idx = i;
+            if (optionRows[i] != null) {
+                optionRows[i].setOnClickListener(v -> {
+                    setFocus(idx);
+                    trigger(idx);
+                });
+            }
+        }
+
+        // 接入 NokiaKeyBinding（禁止写死 keyCode）
+        final NokiaKeyBinding keyBinding =
+                ((NokiaDesktopActivity) requireActivity()).getKeyBinding();
+
+        dialog.setOnKeyListener((d, keyCode, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_DOWN) {
+                return true; // 消费抬起事件
+            }
+
+            // 返回键单独处理（NokiaKeyBinding 不管 BACK）
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                NokiaLog.i(TAG, "返回键：关闭选项菜单");
+                dismiss();
+                return true;
+            }
+
+            int action = keyBinding.resolveAction(event);
+            switch (action) {
+                case NokiaKeyBinding.ACTION_UP:
+                    if (focusIndex > 0) {
+                        setFocus(focusIndex - 1);
+                    }
+                    return true;
+                case NokiaKeyBinding.ACTION_DOWN:
+                    if (focusIndex < OPTION_COUNT - 1) {
+                        setFocus(focusIndex + 1);
+                    }
+                    return true;
+                case NokiaKeyBinding.ACTION_SELECT:
+                    trigger(focusIndex);
+                    return true;
+                case NokiaKeyBinding.ACTION_SOFT_LEFT:
+                case NokiaKeyBinding.ACTION_SOFT_RIGHT:
+                    // 软键关闭弹窗（等效返回）
+                    NokiaLog.i(TAG, "软键：关闭选项菜单");
+                    dismiss();
+                    return true;
+                case NokiaKeyBinding.ACTION_LEFT:
+                case NokiaKeyBinding.ACTION_RIGHT:
+                    // 方向键左右无功能，消费掉避免穿透
+                    return true;
+                default:
+                    return false;
+            }
+        });
+
+        // 默认焦点在"启动"
+        setFocus(0);
+        return dialog;
+    }
+
+    private void setFocus(int index) {
+        focusIndex = index;
+        for (int i = 0; i < OPTION_COUNT; i++) {
+            if (optionRows[i] != null) {
+                if (i == index) {
+                    optionRows[i].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+                } else {
+                    optionRows[i].setBackgroundResource(0);
+                }
+            }
+        }
+    }
+
+    private void trigger(int index) {
+        NokiaLog.i(TAG, "触发选项: " + index);
+        if (listener == null) {
+            dismiss();
+            return;
+        }
+        switch (index) {
+            case OPTION_LAUNCH:
+                listener.onLaunch();
+                break;
+            case OPTION_SETTINGS:
+                listener.onSettings();
+                break;
+            case OPTION_UNINSTALL:
+                listener.onUninstall();
+                break;
+        }
+        dismiss();
+    }
+}
+```
+
+---
+
+### 5.4 布局文件 dialog_nokia_app_options.xml
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- ========== 标题栏 ========== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="28dp"
+        android:background="@drawable/bg_nokia_softkey"
+        android:gravity="center_vertical"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp">
+
+        <TextView
+            android:id="@+id/options_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- ========== 选项列表 ========== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#102040"
+        android:orientation="vertical">
+
+        <!-- 启动 -->
+        <LinearLayout
+            android:id="@+id/option_launch"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/s60_app" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="启动"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- 设置 -->
+        <LinearLayout
+            android:id="@+id/option_settings"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/s60_settings" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="设置"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- 卸载 -->
+        <LinearLayout
+            android:id="@+id/option_uninstall"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@android:drawable/ic_menu_delete" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="卸载"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ========== 底部软键栏 ========== -->
+    <!-- 规范：软键栏只显示文字标签，无高亮/焦点逻辑 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="28dp"
+        android:background="@drawable/bg_nokia_softkey"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp">
+
+        <!-- 左软键：文字贴合内容，不靠 weight 撑满 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical|start"
+            android:paddingHorizontal="8dp"
+            android:text="选择"
+            android:textColor="#64b5f6"
+            android:textSize="12sp" />
+
+        <!-- 中间 spacer 撑开 -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <!-- 右软键：文字贴合内容 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical|end"
+            android:paddingHorizontal="8dp"
+            android:text="返回"
+            android:textColor="#64b5f6"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>
+```
+
+---
+
+### 5.5 NokiaBoxFragment 完整修改后代码（关键部分）
+
+```java
+package ru.playsoftware.j2meloader.nokia;
+
+// ... 导入语句不变 ...
+
+/**
+ * 应用程序中间内容碎片。
+ * 网格模式展示"安装jar"入口 + 已装 JAR 应用网格。
+ * 确认键直接启动应用，左软键弹出选项菜单。
+ */
+public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
+
+    // ---- 网格常量 ----
+    private static final int COLS = 3;
+    private static final int ROW_H_DP = 64;
+    private static final int TITLE_H_DP = 20;
+    private static final int BAR_H_DP = 44;
+
+    // ---- 视图 ----
+    private ScrollView appScroll;
+    private LinearLayout appContainer;
+
+    // ---- 网格模式 ----
+    private View[] gridCellViews;
+    private int rowsPerPage = 4;
+    private int perPage = COLS * rowsPerPage;
+    private int totalGridCells = 0;
+    private int focusIndex = -1;
+    private View selectedView = null;
+
+    // ---- 数据 ----
+    private AppRepository appRepository;
+    private List<AppItem> appItems = new ArrayList<>();
+    private SharedPreferences preferences;
+
+    // ---- 文件选择器 ----
+    private ActivityResultLauncher<String> openFileLauncher;
+
+    // ============================
+    // 生命周期
+    // ============================
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        NokiaLog.i("Box", "onCreate");
+
+        openFileLauncher = registerForActivityResult(
+                FileUtils.getFilePicker(), this::onPickFileResult);
+
+        preferences = PreferenceManager.getDefaultSharedPreferences(requireActivity());
+
+        AppListModel appListModel = new ViewModelProvider(requireActivity()).get(AppListModel.class);
+        appRepository = appListModel.getAppRepository();
+    }
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_nokia_box, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+        host.scaleMidContent(view, false);
+
+        View wall = host.findViewById(R.id.wallpaper);
+        if (wall != null) {
+            wall.setBackgroundResource(R.drawable.bg_nokia_box);
+        }
+        TextView title = host.findViewById(R.id.topTitle);
+        if (title != null) {
+            title.setText("应用程序");
+        }
+        // ===== 修改：左软键文字从"选择"改为"选项" =====
+        host.setBottomBar("选项", null, "退出");
+
+        appScroll = view.findViewById(R.id.appScroll);
+        appContainer = view.findViewById(R.id.appContainer);
+
+        computeRowsPerPage();
+
+        appRepository.observeApps(getViewLifecycleOwner(), this::onDbUpdated);
+
+        NokiaLog.i("Box", "应用程序初始化完成，等待数据加载…");
+    }
+
+    // ============================
+    // 构建网格
+    // ============================
+
+    // buildGrid() 不变 ...
+    // createGridRow() 不变 ...
+    // createGridCell() 不变 ...
+    // populateInstallCell() 不变 ...
+    // populateGlobalProfileCell() 不变 ...
+    // populateAppCell() 不变 ...
+
+    // ============================
+    // 焦点管理 —— 网格模式
+    // ============================
+
+    // setFocusIndex() 不变 ...
+    // clearFocusGrid() 不变 ...
+    // applyFocusGrid() 不变 ...
+    // scrollToVisibleGrid() 不变 ...
+    // onDirectionGrid() 不变 ...
+
+    // ============================
+    // 文件选择与安装
+    // ============================
+
+    // launchFilePicker() 不变 ...
+    // onPickFileResult() 不变 ...
+
+    // ============================
+    // NokiaFocusHost —— 方向键
+    // ============================
+
+    @Override
+    public boolean onDirection(int direction) {
+        // ===== 删除 MODE_SUBMENU 分支 =====
+        return onDirectionGrid(direction);
+    }
+
+    // onDirectionGrid() 不变 ...
+
+    // ============================
+    // NokiaFocusHost —— 确认键
+    // ============================
+
+    @Override
+    public boolean onSelect() {
+        if (focusIndex < 0 || totalGridCells == 0) return false;
+
+        if (focusIndex == 0) {
+            NokiaLog.i("Box", "onSelect: 安装");
+            launchFilePicker();
+            return true;
+        }
+        if (focusIndex == 1) {
+            NokiaLog.i("Box", "onSelect: JAR 全局设置");
+            NokiaGlobalProfile.openGlobalSettings(requireContext());
+            return true;
+        }
+
+        // ===== 修改：直接启动应用，不再进入次级菜单 =====
+        int appIdx = focusIndex - 2;
+        if (appIdx >= 0 && appIdx < appItems.size()) {
+            AppItem app = appItems.get(appIdx);
+            NokiaLog.i("Box", "onSelect: 直接启动 " + app.getTitle());
+            Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
+            return true;
+        }
+        return false;
+    }
+
+    // ============================
+    // 选项菜单
+    // ============================
+
+    /**
+     * 弹出应用选项菜单弹窗。
+     */
+    private void showAppOptionsMenu(AppItem app) {
+        NokiaLog.i("Box", "弹出选项菜单: " + app.getTitle());
+        NokiaAppOptionsDialog dialog = NokiaAppOptionsDialog.newInstance(app.getTitle());
+        dialog.setOptionsListener(new NokiaAppOptionsDialog.OptionsListener() {
+            @Override
+            public void onLaunch() {
+                NokiaLog.i("Box", "选项菜单-启动: " + app.getTitle());
+                Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
+            }
+            @Override
+            public void onSettings() {
+                NokiaLog.i("Box", "选项菜单-设置: " + app.getTitle());
+                Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), true);
+            }
+            @Override
+            public void onUninstall() {
+                NokiaLog.i("Box", "选项菜单-卸载: " + app.getTitle());
+                showUninstallDialog(app);
+            }
+        });
+        dialog.show(getParentFragmentManager(), "app_options");
+    }
+
+    // ============================
+    // 卸载
+    // ============================
+
+    /**
+     * 弹出诺基亚风格卸载确认弹窗。
+     */
+    private void showUninstallDialog(AppItem app) {
+        if (app == null) {
+            NokiaLog.w("Box", "showUninstallDialog: app 为 null，忽略");
+            return;
+        }
+        NokiaLog.i("Box", "弹出卸载确认弹窗: " + app.getTitle());
+        NokiaUninstallDialog dialog = NokiaUninstallDialog.newInstance(app.getTitle());
+        dialog.setConfirmListener(() -> doUninstall(app));
+        dialog.show(getParentFragmentManager(), "uninstall");
+    }
+
+    /** 执行卸载：删除应用目录/存档/图标 + 数据库记录 */
+    private void doUninstall(AppItem app) {
+        if (app == null) return;
+        NokiaLog.i("Box", "执行卸载: " + app.getTitle());
+        AppUtils.deleteApp(app);
+        appRepository.delete(app);
+        // 数据库变更触发 onDbUpdated() 自动重建网格
+    }
+
+    // ============================
+    // NokiaFocusHost —— 软键
+    // ============================
+
+    @Override
+    public boolean onSoftLeft() {
+        // ===== 修改：左软键 = 选项菜单（仅对 JAR 应用） =====
+        if (focusIndex >= 2) {
+            int appIdx = focusIndex - 2;
+            if (appIdx >= 0 && appIdx < appItems.size()) {
+                AppItem app = appItems.get(appIdx);
+                showAppOptionsMenu(app);
+                return true;
+            }
+        }
+        // 安装入口和设置入口保持原行为
+        return onSelect();
+    }
+
+    @Override
+    public boolean onSoftRight() {
+        // ===== 删除 MODE_SUBMENU 判断 =====
+        ((NokiaDesktopActivity) requireActivity()).exitCurrent();
+        return true;
+    }
+
+    @Override
+    public boolean onBack() {
+        // ===== 删除 MODE_SUBMENU 判断 =====
+        ((NokiaDesktopActivity) requireActivity()).exitCurrent();
+        return true;
+    }
+
+    // ============================
+    // 工具方法
+    // ============================
+
+    private int dp(int v) {
+        return (int) (v * getResources().getDisplayMetrics().density);
+    }
+
+    private View spaceView(int w, int h) {
+        View v = new View(requireContext());
+        v.setLayoutParams(new LinearLayout.LayoutParams(w, h));
+        return v;
+    }
+}
+```
+
+---
+
+## 六、时序图
+
+### 6.1 确认键直接启动
+
+```
+用户    NokiaBoxFragment    NokiaDesktopActivity    Config    MicroActivity
+ │            │                    │                  │           │
+ │──方向键───►│                    │                  │           │
+ │            │ 高亮"手机QQ2008"   │                  │           │
+ │            │                    │                  │           │
+ │──确认键───►│                    │                  │           │
+ │            │ onSelect()         │                  │           │
+ │            │ focusIndex=4       │                  │           │
+ │            │ appIdx=2           │                  │           │
+ │            │ Config.startApp()─────────────────────►│           │
+ │            │                    │                  │           │
+ │            │                    │                  │ startApp()│
+ │            │                    │                  │──────────►│
+ │            │                    │                  │           │ 启动MIDlet
+ │            │                    │                  │           │
+ │◄───────────┤                    │                  │           │
+ │ 应用启动    │                    │                  │           │
+```
+
+### 6.2 左软键弹出选项菜单 → 选择启动
+
+```
+用户    NokiaBoxFragment    NokiaAppOptionsDialog    Config
+ │            │                    │                  │
+ │──方向键───►│                    │                  │
+ │            │ 高亮"手机QQ2008"   │                  │
+ │            │                    │                  │
+ │──左软键───►│                    │                  │
+ │            │ onSoftLeft()       │                  │
+ │            │ focusIndex=4       │                  │
+ │            │ showAppOptionsMenu()                 │
+ │            │──newInstance()────►│                  │
+ │            │──show()───────────►│                  │
+ │            │                    │ 显示弹窗          │
+ │            │                    │ 默认高亮"启动"    │
+ │◄───────────┤                    │                  │
+ │ 弹窗显示   │                    │                  │
+ │            │                    │                  │
+ │──确认键───►│                    │                  │
+ │            │                    │ onKey()          │
+ │            │                    │ trigger(0)       │
+ │            │                    │ listener.onLaunch()│
+ │            │◄───────────────────┤                  │
+ │            │ Config.startApp()─────────────────────►│
+ │            │                    │ dismiss()          │
+ │◄───────────┤                    │                  │
+ │ 应用启动   │                    │                  │
+```
+
+### 6.3 左软键弹出选项菜单 → 选择卸载
+
+```
+用户    NokiaBoxFragment    NokiaAppOptionsDialog    NokiaUninstallDialog    AppRepository
+ │            │                    │                        │                    │
+ │──左软键───►│                    │                        │                    │
+ │            │ showAppOptionsMenu()│                       │                    │
+ │            │──newInstance()────►│                        │                    │
+ │            │──show()───────────►│ 显示弹窗                │                    │
+ │            │                    │                        │                    │
+ │──方向键下─►│                    │                        │                    │
+ │            │                    │ setFocus(1)            │                    │
+ │            │                    │ 高亮"设置"             │                    │
+ │            │                    │                        │                    │
+ │──方向键下─►│                    │                        │                    │
+ │            │                    │ setFocus(2)            │                    │
+ │            │                    │ 高亮"卸载"             │                    │
+ │            │                    │                        │                    │
+ │──确认键───►│                    │                        │                    │
+ │            │                    │ trigger(2)             │                    │
+ │            │                    │ listener.onUninstall()  │                    │
+ │            │◄───────────────────┤                        │                    │
+ │            │ showUninstallDialog()│                       │                    │
+ │            │──newInstance()────────────────────────────►│                    │
+ │            │──show()────────────────────────────────────►│ 显示确认弹窗        │
+ │            │                    │ dismiss()               │                    │
+ │            │                    │                        │                    │
+ │            │                    │                        │◄──确认卸载─────────│
+ │            │                    │                        │ confirmListener.run()│
+ │            │◄────────────────────────────────────────────┤ doUninstall(app)   │
+ │            │ AppUtils.deleteApp(app)                     │                    │
+ │            │ appRepository.delete(app)───────────────────────────────────────►│
+ │            │                    │                        │                    │ 删除记录
+ │            │                    │                        │                    │ 触发观察者
+ │            │◄────────────────────────────────────────────────────────────────│ onDbUpdated()
+ │            │ buildGrid() 刷新网格                      │                    │
+```
+
+---
+
+## 七、风险与应对
+
+| 风险 | 影响 | 应对措施 |
+|---|---|---|
+| 用户习惯已适应旧版（确认键进菜单） | 操作困惑 | 左软键明确标注"选项"，符合真机习惯；确认键直接启动更直觉 |
+| 选项菜单弹窗在 240×320 屏幕上过大 | 遮挡内容 | 弹窗高度固定（3×40dp=120dp + 标题28dp + 软键28dp=176dp），适配小屏 |
+| 方向键在弹窗和底层网格间穿透 | 误操作 | 弹窗消费所有方向键事件，返回 true 拦截 |
+| 快速连续按键导致重复触发 | 状态异常 | 弹窗消费抬起事件（`ACTION_DOWN` 才处理），避免重复 |
+
+---
+
+## 八、测试清单
+
+### 8.1 确认键直接启动
+
+- [ ] 方向键选中 JAR 应用，确认键直接启动应用
+- [ ] 方向键选中"安装"，确认键启动文件选择器
+- [ ] 方向键选中"JAR 全局设置"，确认键打开设置页
+- [ ] 启动后按返回键回到桌面
+
+### 8.2 左软键选项菜单
+
+- [ ] 方向键选中 JAR 应用，左软键弹出选项菜单
+- [ ] 选项菜单默认高亮"启动"
+- [ ] 方向键上下切换高亮（启动→设置→卸载）
+- [ ] 确认键触发当前高亮选项
+- [ ] 左软键关闭弹窗
+- [ ] 右软键关闭弹窗
+- [ ] 返回键关闭弹窗
+- [ ] 触摸点击选项直接触发
+
+### 8.3 选项菜单各功能
+
+- [ ] 选择"启动"→启动应用
+- [ ] 选择"设置"→打开应用设置页
+- [ ] 选择"卸载"→弹出卸载确认弹窗→确认后删除应用→网格刷新
+
+### 8.4 边界情况
+
+- [ ] 选中"安装"或"设置"时按左软键，等效确认键
+- [ ] 空应用列表时方向键和确认键无异常
+- [ ] 快速连续按键无重复触发
+
+### 8.5 兼容性
+
+- [ ] 240×320 设备（4a24ecf）
+- [ ] 320×480 设备
+- [ ] 现代长屏设备（jz5dauzlu8euw4e6）
+
+---
+
+## 九、附录
+
+### 9.1 相关文件索引
+
+| 文件 | 路径 |
+|---|---|
+| `NokiaBoxFragment.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/NokiaBoxFragment.java` |
+| `NokiaAppOptionsDialog.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/NokiaAppOptionsDialog.java`（新建） |
+| `NokiaUninstallDialog.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/NokiaUninstallDialog.java` |
+| `dialog_nokia_app_options.xml` | `app/src/main/res/layout/dialog_nokia_app_options.xml`（新建） |
+| `dialog_nokia_uninstall.xml` | `app/src/main/res/layout/dialog_nokia_uninstall.xml` |
+| `NokiaKeyBinding.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/NokiaKeyBinding.java` |
+| `NokiaFocusHost.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/NokiaFocusHost.java` |
+
+### 9.2 代码规范检查清单
+
+- [ ] `NokiaAppOptionsDialog` 接入 `NokiaKeyBinding`，禁止写死 keyCode
+- [ ] 软键栏无高亮/焦点逻辑（`bg_nokia_selected` 不用于软键）
+- [ ] 弹窗消费抬起事件（`ACTION_DOWN` 才处理）
+- [ ] 返回键单独处理（`NokiaKeyBinding` 不管 BACK）
+- [ ] 所有日志使用 `NokiaLog.i/d/w/e`
+
+---
+
+> 本方案通过删除次级菜单页面、改为弹窗方式，实现确认键直接启动、左软键弹出选项的诺基亚真机交互习惯。核心逻辑简化，代码量减少，同时保持与原有卸载弹窗的 UI 风格一致。
