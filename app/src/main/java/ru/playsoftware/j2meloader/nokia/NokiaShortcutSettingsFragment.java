@@ -245,7 +245,7 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 			empty.setTextColor(0xFFAAAAAA);
 			empty.setTextSize(12);
 			empty.setGravity(Gravity.CENTER);
-			empty.setPadding(0, dp(20), 0, 0);
+			empty.setPadding(0, NokiaDimens.dp(getResources(), 20), 0, 0);
 			appListLayout.addView(empty);
 			itemViews = new View[0];
 			updateCountText();
@@ -261,14 +261,14 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.MATCH_PARENT, dp(38)));
-			row.setPadding(dp(8), dp(3), dp(8), dp(3));
+					LinearLayout.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 38)));
+			row.setPadding(NokiaDimens.dp(getResources(), 8), NokiaDimens.dp(getResources(), 3), NokiaDimens.dp(getResources(), 8), NokiaDimens.dp(getResources(), 3));
 			row.setClickable(true);
 
 
 			// 图标
 			ImageView iv = new ImageView(requireContext());
-			iv.setLayoutParams(new LinearLayout.LayoutParams(dp(24), dp(24)));
+			iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 24), NokiaDimens.dp(getResources(), 24)));
 			if (app.icon != null) {
 				iv.setImageDrawable(app.icon);
 			} else {
@@ -280,7 +280,7 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 
 			// 间距
 			View space = new View(requireContext());
-			space.setLayoutParams(new LinearLayout.LayoutParams(dp(8), 1));
+			space.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 8), 1));
 			row.addView(space);
 
 			// 应用名
@@ -298,8 +298,8 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 			TextView tvCheck = new TextView(requireContext());
 			tvCheck.setLayoutParams(new LinearLayout.LayoutParams(
 					LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-			tvCheck.setWidth(dp(24));
-			tvCheck.setHeight(dp(24));
+			tvCheck.setWidth(NokiaDimens.dp(getResources(), 24));
+			tvCheck.setHeight(NokiaDimens.dp(getResources(), 24));
 			tvCheck.setGravity(Gravity.CENTER);
 			tvCheck.setTextSize(14);
 			if (selectedKeys.contains(key)) {
@@ -542,7 +542,4 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 		}
 	}
 
-	private int dp(int v) {
-		return (int) (v * getResources().getDisplayMetrics().density);
-	}
 }

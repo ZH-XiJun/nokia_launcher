@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 按键绑定设置界面（碎片）：240dp 宽 × 262dp 高，由基类缩放。
-     262dp = 320 - 36 - 22，正好填满中间容器不被裁切。 -->
+<!-- 按键绑定设置界面（碎片）：240dp 宽，高度 match_parent 自适应中间容器。
+     与桌面弹性化一致，避免写死高度触发 scaleMidContent 二次缩小导致右侧缝隙。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="240dp"
-    android:layout_height="262dp"
+    android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/bg_nokia_menu">
 

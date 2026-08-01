@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 桌面待机屏中间内容（碎片）：240dp 宽 × 262dp 高，由基类缩放。
-     262dp = 320(设计总高) - 36(顶栏) - 22(底栏)，正好填满中间容器不被裁切。
+<!-- 桌面待机屏中间内容（碎片）：240dp 宽，高度 match_parent 自适应中间容器。
+     顶栏与快捷栏（含上下点线）位置固定优先保障；通知/组件区填充剩余空间，
+     允许被挤压（后续会做可滚动）。基类缩放不再触发二次缩小分支。
      运营商名(中国移动/联通等)已迁到 nokia_top_bar.xml，由 StatusBarController 统一管理。 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="240dp"
-    android:layout_height="262dp">
+    android:layout_height="match_parent">
 
-    <!-- 快捷栏上方的点线分割线 -->
+    <!-- 快捷栏上方的点线分割线（代码覆盖背景为 NokiaDashedLineDrawable 点阵） -->
     <View
         android:id="@+id/shortcutDividerTop"
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_alignParentTop="true"
         android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
-        android:background="@drawable/bg_nokia_divider_dashed" />
+        android:layout_marginEnd="6dp" />
 
     <HorizontalScrollView
         android:id="@+id/shortcutBar"
@@ -56,20 +56,20 @@
         android:textSize="10sp"
         android:visibility="gone" />
 
-    <!-- 快捷栏与通知区之间的点线分割线 -->
+    <!-- 快捷栏与通知区之间的点线分割线（代码覆盖背景为 NokiaDashedLineDrawable 点阵） -->
     <View
         android:id="@+id/shortcutDivider"
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_below="@id/shortcutBar"
         android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
-        android:background="@drawable/bg_nokia_divider_dashed" />
+        android:layout_marginEnd="6dp" />
 
+    <!-- 通知区：填充快捷栏下方剩余空间，允许被挤压 -->
     <LinearLayout
         android:id="@+id/notificationArea"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:layout_below="@id/shortcutDivider"
         android:orientation="vertical"
         android:paddingStart="8dp"

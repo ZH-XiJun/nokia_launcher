@@ -141,9 +141,10 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 			View divider = new View(requireContext());
 			divider.setBackgroundColor(0xFF2a4a7a);
 			LinearLayout.LayoutParams lpDiv = new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.MATCH_PARENT, 1);
-			lpDiv.leftMargin = 12;
-			lpDiv.rightMargin = 12;
+					LinearLayout.LayoutParams.MATCH_PARENT,
+					NokiaDimens.dp(getResources(), 1));
+			lpDiv.leftMargin = NokiaDimens.dp(getResources(), 12);
+			lpDiv.rightMargin = NokiaDimens.dp(getResources(), 12);
 
 			bindListContainer.addView(row);
 			bindListContainer.addView(divider, lpDiv);
@@ -156,7 +157,8 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 		row.setOrientation(LinearLayout.HORIZONTAL);
 		row.setClickable(true);
 
-		row.setPadding(12, 8, 12, 8);
+		row.setPadding(NokiaDimens.dp(getResources(), 12), NokiaDimens.dp(getResources(), 8),
+				NokiaDimens.dp(getResources(), 12), NokiaDimens.dp(getResources(), 8));
 
 		// 左侧：动作名
 		TextView tvAction = new TextView(requireContext());

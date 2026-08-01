@@ -135,15 +135,15 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.MATCH_PARENT, dp(34)));
-			row.setPadding(dp(6), dp(2), dp(6), dp(2));
+					LinearLayout.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 34)));
+			row.setPadding(NokiaDimens.dp(getResources(), 6), NokiaDimens.dp(getResources(), 2), NokiaDimens.dp(getResources(), 6), NokiaDimens.dp(getResources(), 2));
 			if (enabled) {
 				row.setClickable(true);
 			}
 
 			// 图标
 			ImageView iv = new ImageView(requireContext());
-			iv.setLayoutParams(new LinearLayout.LayoutParams(dp(22), dp(22)));
+			iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
 			try {
 				iv.setImageDrawable(ContextCompat.getDrawable(requireContext(),
 						NokiaWidgetItem.getTypeIcon(type)));
@@ -156,7 +156,7 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage
 			row.addView(iv);
 
 			// 间距
-			row.addView(spaceView(dp(8), 1));
+			row.addView(spaceView(NokiaDimens.dp(getResources(), 8), 1));
 
 			// 名称
 			TextView tv = new TextView(requireContext());
@@ -348,9 +348,6 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage
 		NokiaLog.i(TAG, "Toast: " + msg);
 	}
 
-	private int dp(int v) {
-		return (int) (v * getResources().getDisplayMetrics().density);
-	}
 
 	private View spaceView(int w, int h) {
 		View v = new View(requireContext());

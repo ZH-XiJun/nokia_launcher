@@ -212,7 +212,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 		LinearLayout row = new LinearLayout(requireContext());
 		row.setOrientation(LinearLayout.HORIZONTAL);
 		row.setLayoutParams(new LinearLayout.LayoutParams(
-				LinearLayout.LayoutParams.MATCH_PARENT, dp(ROW_H_DP)));
+				LinearLayout.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), ROW_H_DP)));
 		return row;
 	}
 
@@ -222,13 +222,13 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 		cell.setGravity(Gravity.CENTER);
 		cell.setLayoutParams(new LinearLayout.LayoutParams(
 				0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
-		cell.setPadding(dp(4), dp(4), dp(4), dp(4));
+		cell.setPadding(NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4));
 		return cell;
 	}
 
 	private void populateInstallCell(LinearLayout cell) {
 		ImageView iv = new ImageView(requireContext());
-		iv.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
+		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 36)));
 		try {
 			Drawable icon = ContextCompat.getDrawable(requireContext(), R.drawable.s60_app);
 			if (icon != null) iv.setImageDrawable(icon);
@@ -243,13 +243,13 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 		tv.setTextSize(9);
 		tv.setSingleLine(true);
 		tv.setEllipsize(TextUtils.TruncateAt.END);
-		tv.setMaxWidth(dp(72));
+		tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
 		cell.addView(tv);
 	}
 
 	private void populateGlobalProfileCell(LinearLayout cell) {
 		ImageView iv = new ImageView(requireContext());
-		iv.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
+		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 36)));
 		try {
 			Drawable icon = ContextCompat.getDrawable(requireContext(), R.drawable.s60_settings);
 			if (icon != null) iv.setImageDrawable(icon);
@@ -264,13 +264,13 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 		tv.setTextSize(9);
 		tv.setSingleLine(true);
 		tv.setEllipsize(TextUtils.TruncateAt.END);
-		tv.setMaxWidth(dp(72));
+		tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
 		cell.addView(tv);
 	}
 
 	private void populateAppCell(LinearLayout cell, AppItem app) {
 		ImageView iv = new ImageView(requireContext());
-		iv.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
+		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 36)));
 		// 加载 JAR 图标
 		String imgPath = app.getImagePathExt();
 		if (imgPath != null) {
@@ -291,7 +291,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 		tv.setTextSize(9);
 		tv.setSingleLine(true);
 		tv.setEllipsize(TextUtils.TruncateAt.END);
-		tv.setMaxWidth(dp(72));
+		tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
 		cell.addView(tv);
 	}
 
@@ -589,9 +589,6 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 	// 工具方法
 	// ============================
 
-	private int dp(int v) {
-		return (int) (v * getResources().getDisplayMetrics().density);
-	}
 
 	private View spaceView(int w, int h) {
 		View v = new View(requireContext());

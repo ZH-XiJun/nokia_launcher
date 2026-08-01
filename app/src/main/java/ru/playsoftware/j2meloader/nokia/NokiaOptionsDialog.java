@@ -183,12 +183,12 @@ public class NokiaOptionsDialog extends DialogFragment {
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					ViewGroup.LayoutParams.MATCH_PARENT, dp(40)));
-			row.setPadding(dp(14), 0, dp(14), 0);
+					ViewGroup.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 40)));
+			row.setPadding(NokiaDimens.dp(getResources(), 14), 0, NokiaDimens.dp(getResources(), 14), 0);
 
 			if (item.icon != 0) {
 				ImageView iv = new ImageView(requireContext());
-				iv.setLayoutParams(new LinearLayout.LayoutParams(dp(24), dp(24)));
+				iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 24), NokiaDimens.dp(getResources(), 24)));
 				try {
 					iv.setImageResource(item.icon);
 				} catch (Exception ignored) {}
@@ -202,7 +202,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 			tv.setLayoutParams(new LinearLayout.LayoutParams(
 					ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 			if (item.icon != 0) {
-				tv.setPadding(dp(10), 0, 0, 0);
+				tv.setPadding(NokiaDimens.dp(getResources(), 10), 0, 0, 0);
 			}
 			tv.setText(item.label);
 			tv.setTextSize(14);
@@ -276,7 +276,4 @@ public class NokiaOptionsDialog extends DialogFragment {
 		}
 	}
 
-	private int dp(int v) {
-		return (int) (v * getResources().getDisplayMetrics().density);
-	}
 }

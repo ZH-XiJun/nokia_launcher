@@ -7,7 +7,7 @@
     <!-- ========== 标题栏 ========== -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="28dp"
+        android:layout_height="@dimen/nokia_dialog_title_bar_height"
         android:background="@drawable/bg_nokia_softkey"
         android:gravity="center_vertical"
         android:paddingStart="10dp"
@@ -19,7 +19,7 @@
             android:layout_height="wrap_content"
             android:text="安装"
             android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textSize="@dimen/nokia_dialog_title_text"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -55,7 +55,7 @@
                 android:layout_marginTop="8dp"
                 android:text="正在加载..."
                 android:textColor="#FFFFFF"
-                android:textSize="12sp" />
+                android:textSize="@dimen/nokia_dialog_body_text" />
         </LinearLayout>
 
         <!-- 结果视图（成功/失败共用） -->
@@ -69,8 +69,8 @@
 
             <ImageView
                 android:id="@+id/install_app_icon"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="@dimen/nokia_dialog_icon_size"
+                android:layout_height="@dimen/nokia_dialog_icon_size"
                 android:scaleType="fitCenter" />
 
             <TextView
@@ -79,7 +79,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:textColor="#FFFFFF"
-                android:textSize="14sp"
+                android:textSize="@dimen/nokia_dialog_title_text"
                 android:textStyle="bold" />
 
             <TextView
@@ -88,14 +88,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:textColor="#64b5f6"
-                android:textSize="12sp" />
+                android:textSize="@dimen/nokia_dialog_body_text" />
         </LinearLayout>
     </LinearLayout>
 
     <!-- ========== 底部软键栏 ========== -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="28dp"
+        android:layout_height="@dimen/nokia_dialog_title_bar_height"
         android:background="@drawable/bg_nokia_softkey"
         android:orientation="horizontal"
         android:paddingStart="10dp"
@@ -111,7 +111,7 @@
             android:focusable="true"
             android:text="取消"
             android:textColor="#64b5f6"
-            android:textSize="12sp" />
+            android:textSize="@dimen/nokia_dialog_body_text" />
 
         <TextView
             android:id="@+id/softRight"
@@ -122,7 +122,7 @@
             android:clickable="true"
             android:focusable="true"
             android:textColor="#64b5f6"
-            android:textSize="12sp"
+            android:textSize="@dimen/nokia_dialog_body_text"
             android:visibility="invisible" />
     </LinearLayout>
 </LinearLayout>

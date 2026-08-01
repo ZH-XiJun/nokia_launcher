@@ -79,10 +79,10 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		View dividerTop = view.findViewById(R.id.shortcutDividerTop);
 		View dividerBottom = view.findViewById(R.id.shortcutDivider);
 		if (dividerTop != null) {
-			dividerTop.setBackground(new NokiaDashedLineDrawable(0x60FFFFFF, 3, 3));
+			dividerTop.setBackground(new NokiaDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
 		}
 		if (dividerBottom != null) {
-			dividerBottom.setBackground(new NokiaDashedLineDrawable(0x60FFFFFF, 3, 3));
+			dividerBottom.setBackground(new NokiaDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
 		}
 
 		settingsStorage = new NokiaSettingsStorage(requireContext());
@@ -182,7 +182,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			// 空状态：显示提示文字
 			TextView hint = new TextView(requireContext());
 			hint.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.WRAP_CONTENT, dp(34)));
+					LinearLayout.LayoutParams.WRAP_CONTENT, NokiaDimens.dp(getResources(), 34)));
 			hint.setGravity(Gravity.CENTER);
 			hint.setText("（无快捷应用）");
 			hint.setTextColor(0xFF888888);
@@ -225,16 +225,16 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	private LinearLayout createShortcutCell(ShortcutApp app, int index) {
 		Context ctx = requireContext();
 		LinearLayout cell = new LinearLayout(ctx);
-		cell.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(34)));
+		cell.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 34)));
 		cell.setOrientation(LinearLayout.VERTICAL);
 		cell.setGravity(Gravity.CENTER);
-		cell.setPadding(dp(4), dp(4), dp(4), dp(4));
+		cell.setPadding(NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4));
 		cell.setClickable(true);
 
 		cell.setTag(app);
 
 		ImageView iv = new ImageView(ctx);
-		iv.setLayoutParams(new LinearLayout.LayoutParams(dp(22), dp(22)));
+		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
 		// 首帧仅加载内存图标（S60 缓存 / 关键词匹配，无 IPC）；真实图标由后台异步刷新
 		Drawable icon = loadShortcutIconMemory(app);
 		if (icon != null) {
@@ -604,7 +604,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			View pv = (View) parent;
 			if (pv.getId() == R.id.shortcutBar) {
 				int scrollX = target.getLeft() - pv.getPaddingLeft();
-				pv.scrollTo(Math.max(0, scrollX - dp(12)), 0);
+				pv.scrollTo(Math.max(0, scrollX - NokiaDimens.dp(getResources(), 12)), 0);
 				return;
 			}
 			parent = pv.getParent();
@@ -662,7 +662,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		if (left > maxLeft) left = Math.max(2, maxLeft);
 		shortcutNameBubble.setX(left);
 		// 气泡半透明浮在快捷栏图标下方（不遮挡图标），不占用布局空间
-		shortcutNameBubble.setY(shortcutBar.getTop() + shortcutBar.getHeight() + dp(1));
+		shortcutNameBubble.setY(shortcutBar.getTop() + shortcutBar.getHeight() + NokiaDimens.dp(getResources(), 1));
 		shortcutNameBubble.setVisibility(View.VISIBLE);
 		NokiaLog.d("Desktop", "显示快捷栏名称气泡: " + app.label + " @x=" + left);
 
@@ -711,7 +711,4 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		} catch (Exception ignored) {}
 	}
 
-	private int dp(int v) {
-		return (int) (v * getResources().getDisplayMetrics().density);
-	}
 }

@@ -170,13 +170,93 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 
 通用原则：所有 API 22+ 的类/方法引用都要 `SDK_INT` 守卫；Dalvik 验证器对运行时不执行到的高版本类引用只会打 `VFY Could not find class '...'` **无害告警**，不算崩溃。低版本设备（尤其 4.4）建议用「修一处→构建→装到 4a24ecf 实测」的迭代方式，以设备真实崩溃为准逐个修，而非盲目猜测。
 
-## 分辨率适配
+## 双分辨率适配规范（重要）
 
-本应用需要适配三种分辨率
+### 适配目标分级
 
-- 240 * 320 （重要）
-- 320 * 480 （重要）
-- 现代 16:9 及以上比例的长条形屏幕 （次要）
+| 优先级 | 分辨率 | 设备 | 验收标准 |
+|---|---|---|---|
+| **主适配** | 240×320 | 4a24ecf（Android 4.4，density 120→160） | 所有界面不崩、不裁切、不错位，点线清晰 |
+| **主适配** | 320×480 | tcpip 设备（density 136→160） | 同上，且顶栏/中间区比例可接受 |
+| **次要适配（兜底）** | 16:9 长屏 | jz5dauzlu8euw4e6（小米，仅 push 安装） | 不崩、不变形、不裁切、可正常操作即可 |
+
+### 适配架构（理解后才能改）
+
+项目采用 **「240×320 dp 设计基准 + 运行时整体缩放」** 方案，中枢在 `NokiaBaseActivity.java`：
+
+- **设计常量**：`BASE_W=240`、`TOP_H=36`、`BOT_H=22`、`MID_H=262`
+- **缩放计算**：`scale = 屏宽dp / 240`（高度不足退化为 `屏高dp / 320` 的 contain 模式）
+- **中间面板**：`scaleMidContent()` 对 midPanel 内容 `setScaleX/Y` 整体放大，接近整数时（±0.04）吸附到整数 scale；内容高 = panelH（match_parent）时跳过二次缩小分支
+- **底栏**：`scalePanelContent()` 缩放内层内容，栏高设为 `22*scale`
+- **顶栏**：**不参与缩放**（原生 dp 渲染保图标清晰）
+- **density 修正**：`attachBaseContext()` 把 <160 DPI 强制吸附到 160（mdpi），非标准值吸附到最近标准值
+
+**关键约束：不改动「240 基准 + 整体缩放」架构，不引入资源限定符目录（如 values-sw320dp、layout-hdpi 等），避免与代码缩放双轨冲突。**
+
+### 尺寸规范
+
+#### 统一尺寸工具类 NokiaDimens
+
+所有 dp → px 换算**必须**通过 `ru.playsoftware.j2meloader.nokia.NokiaDimens` 完成，**禁止**在 Fragment / Dialog / Drawable 中自行写 `(int)(v * density)`：
+
+```java
+// 正确
+NokiaDimens.dp(getResources(), 36)
+
+// 禁止
+(int)(36 * getResources().getDisplayMetrics().density)
+```
+
+#### 禁止 px 写死
+
+**任何地方都不允许写死 px 值**（如 `LayoutParams(..., 1)`、`setPadding(12, 8, 12, 8)`），必须通过 `NokiaDimens.dp()` 换算。此前 `NokiaKeyBindFragment` 的分隔线高度、margin、padding 全是 px，已修复——不要重蹈。
+
+#### 弹窗尺寸收敛至 dimens.xml
+
+弹窗标题栏/底栏高度、标题/内容字号已收敛至 `values/dimens.xml`（`nokia_dialog_title_bar_height` 等），新增弹窗同理，禁止在布局 XML 中硬编码 `28dp` / `14sp` / `12sp`。
+
+#### 写死高度导致二次缩小的风险
+
+任何 Fragment 根布局 `android:layout_height="262dp"`（写死设计稿高度）在 panelH < 262dp 时会触发 `scaleMidContent` 二次缩小分支（`finalScale = panelH / contentH`），导致内容整体缩水、右侧出现缝隙。**新 Fragment 一律用 `match_parent`，或确保内容总高 ≤ panelH。**
+
+已修复的案例：`fragment_nokia_desktop.xml`、`fragment_nokia_key_bind.xml`、`fragment_nokia_key_bind_wizard.xml`。
+
+### 点线（虚线分隔线）标准实现
+
+项目使用 `NokiaDashedLineDrawable` 绘制横向点线分隔线（如桌面快捷栏上下方），**禁止使用 XML shape dash 虚线或 DashPathEffect**：
+
+- **XML `shape="line"` + `dashWidth/dashGap`**：部分 ROM/API 不渲染
+- **`DashPathEffect` + 硬件加速**：Android 4.4 上可能画成实线或不渲染；1px 线宽 + 抗锯齿会羽化糊成实线
+- **正确做法**：`NokiaDashedLineDrawable` 用 `drawRect` 循环画实心方块点阵（FILL 样式无抗锯齿，全版本硬件加速正常），构造时传入调用方 `Resources`（不可用 `Resources.getSystem()`，会绕过 density 修正）
+
+```java
+// 正确：传入 getResources()，点宽 3dp 间隔 3dp
+view.setBackground(new NokiaDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
+
+// 禁止
+view.setBackground(new NokiaDashedLineDrawable(0x60FFFFFF, 3, 3)); // 旧构造，用 Resources.getSystem()
+```
+
+### 布局原则：固定区 + 弹性区
+
+- **顶栏与快捷应用栏（含上下点线）位置优先保障**，稳定可见，不可被压缩/裁切
+- **中间通知区/桌面组件区**为弹性区（`layout_height="match_parent"` + `layout_below` 下点线），允许被挤压（后续会做可滚动）
+- 新页面设计时遵循同样原则：标题/工具栏固定 + 内容区弹性
+
+### 新界面 Checklist
+
+新增或修改任何 nokia 界面时，逐项自查：
+
+- [ ] 尺寸换算走 `NokiaDimens.dp()`，无裸 `(int)(v*density)`
+- [ ] 布局无 px 写死值（LayoutParams 高度/宽度、padding、margin 等）
+- [ ] Fragment 根布局高度为 `match_parent`（非 262dp）
+- [ ] 弹窗关键尺寸引用 `dimens.xml`（非硬编码 28dp/14sp/12sp）
+- [ ] 点线分隔线用 `NokiaDashedLineDrawable(getResources(), ...)`（非 XML shape dash）
+- [ ] 在 **240×320（4a24ecf）** 和 **320×480（tcpip）** 两台真机上截图验证
+- [ ] 验证重点：点线清晰、无右侧缝隙、列表最后一项不被底栏遮挡、弹窗比例合适
+
+
+
 
 
 ## 设备说明

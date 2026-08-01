@@ -5,7 +5,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/appScroll"
     android:layout_width="240dp"
-    android:layout_height="262dp">
+    android:layout_height="262dp"
     android:scrollbars="none"
     android:fadingEdge="none"
     android:overScrollMode="never">

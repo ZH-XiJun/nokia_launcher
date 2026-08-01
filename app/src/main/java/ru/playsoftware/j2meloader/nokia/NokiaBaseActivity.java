@@ -267,16 +267,21 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 				panel.setVisibility(View.VISIBLE);
 				int panelH = panel.getHeight();
 				// 顶栏已改为 wrap_content 优先完整显示，中间容器高度可能小于 MID_H*scale。
-				// 若内容超出可用高度，整体等比缩小以完整显示，避免底部被裁切；
-				// 宽度会同步缩小产生极窄黑边，优先保证垂直完整。
+				// 若内容高度 match_parent（与 panelH 接近），说明内容自行填充了容器，
+				// 跳过二次缩小分支（避免点线/分隔线被采样掉，桌面弹性布局依赖此行为）。
 				int contentH = content.getHeight();
 				float finalScale = fScale;
 				int visualH;
-				if (contentH > 0) {
+				if (contentH > 0 && panelH > 0) {
 					visualH = (int) (contentH * fScale);
-					if (panelH > 0 && visualH > panelH) {
+					// 内容高度与面板高度接近（±2px 容差，match_parent 场景），跳过二次缩小
+					boolean contentFillsPanel = Math.abs(contentH - panelH) <= 2;
+					if (!contentFillsPanel && visualH > panelH) {
 						finalScale = (float) panelH / contentH;
 						visualH = panelH;
+						Log.i("NokiaScale", "scaleMidContent shrink: contentH=" + contentH
+								+ " panelH=" + panelH + " oldScale=" + fScale
+								+ " finalScale=" + finalScale);
 					}
 				} else {
 					visualH = (int) (MID_H * fDensity * fScale);

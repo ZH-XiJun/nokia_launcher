@@ -70,21 +70,21 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.MATCH_PARENT, dp(36)));
-			row.setPadding(dp(10), dp(4), dp(10), dp(4));
+					LinearLayout.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 36)));
+			row.setPadding(NokiaDimens.dp(getResources(), 10), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 10), NokiaDimens.dp(getResources(), 4));
 			row.setClickable(true);
 
 
 			// 图标
 			ImageView ivIcon = new ImageView(requireContext());
-			ivIcon.setLayoutParams(new LinearLayout.LayoutParams(dp(22), dp(22)));
+			ivIcon.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
 			try {
 				ivIcon.setImageDrawable(ContextCompat.getDrawable(requireContext(), ITEM_ICONS[i]));
 			} catch (Exception ignored) {}
 			row.addView(ivIcon);
 
 			// 间距
-			row.addView(spaceView(dp(8), 1));
+			row.addView(spaceView(NokiaDimens.dp(getResources(), 8), 1));
 
 			// 名称
 			TextView tvName = new TextView(requireContext());
@@ -235,9 +235,6 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 		}
 	}
 
-	private int dp(int v) {
-		return (int) (v * getResources().getDisplayMetrics().density);
-	}
 
 	private View spaceView(int w, int h) {
 		View v = new View(requireContext());

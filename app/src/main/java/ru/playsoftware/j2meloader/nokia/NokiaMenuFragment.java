@@ -389,7 +389,7 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 			LinearLayout row = new LinearLayout(requireContext());
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.MATCH_PARENT, dp(ROW_H_DP)));
+					LinearLayout.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), ROW_H_DP)));
 
 			for (int c = 0; c < COLS; c++) {
 				int pos = r * COLS + c;
@@ -398,14 +398,14 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 				cell.setGravity(Gravity.CENTER);
 				cell.setLayoutParams(new LinearLayout.LayoutParams(
 						0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
-				cell.setPadding(dp(4), dp(4), dp(4), dp(4));
+				cell.setPadding(NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4));
 
 				if (pos < count) {
 					NokiaAppItem item = items.get(start + pos);
 					pageItems[pos] = item;
 
 					ImageView iv = new ImageView(requireContext());
-					iv.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
+					iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 36)));
 					if (item.icon != null) {
 						// 关闭缩放过滤：S60 图标为 nodpi 位图，最近邻缩放更锐利、契合复古风格，
 						// 避免 36dp 内降采样发虚（API 19 尤其明显）；真实应用图标密度感知，影响甚微。
@@ -420,7 +420,7 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 					tv.setTextSize(9);
 					tv.setSingleLine(true);
 					tv.setEllipsize(TextUtils.TruncateAt.END);
-					tv.setMaxWidth(dp(72));
+					tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
 					cell.addView(iv);
 					cell.addView(tv);
 
@@ -443,9 +443,6 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 		}
 	}
 
-	private int dp(int v) {
-		return (int) (v * getResources().getDisplayMetrics().density);
-	}
 
 	// ---- NokiaFocusHost 接口 ----
 
@@ -547,7 +544,7 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 	 * 否则不消费，事件继续下发，cell 的 onClick 正常启动应用。
 	 */
 	private void initSwipeListener(View root) {
-		swipeThreshold = dp(24);   // 位移阈值（dp）
+		swipeThreshold = NokiaDimens.dp(getResources(), 24);   // 位移阈值（dp）
 		swipeMinVel = 0.35f;       // 速度阈值（px/ms，快速轻扫也翻页）
 		swipeTouchListener = new View.OnTouchListener() {
 			private float downX, downY;

@@ -482,7 +482,7 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 			empty.setTextColor(0xFFAAAAAA);
 			empty.setTextSize(12);
 			empty.setGravity(Gravity.CENTER);
-			empty.setPadding(0, dp(20), 0, 0);
+			empty.setPadding(0, NokiaDimens.dp(getResources(), 20), 0, 0);
 			listLayout.addView(empty);
 			itemViews = new View[0];
 			focusIndex = -1;
@@ -499,14 +499,14 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.MATCH_PARENT, dp(34)));
-			row.setPadding(dp(6), dp(2), dp(6), dp(2));
+					LinearLayout.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 34)));
+			row.setPadding(NokiaDimens.dp(getResources(), 6), NokiaDimens.dp(getResources(), 2), NokiaDimens.dp(getResources(), 6), NokiaDimens.dp(getResources(), 2));
 			row.setClickable(true);
 
 			// 删除模式：行首勾选标记
 			if (mode == MODE_DELETE) {
 				TextView tvCheck = new TextView(requireContext());
-				tvCheck.setLayoutParams(new LinearLayout.LayoutParams(dp(24), dp(24)));
+				tvCheck.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 24), NokiaDimens.dp(getResources(), 24)));
 				tvCheck.setGravity(Gravity.CENTER);
 				tvCheck.setTextSize(13);
 				boolean isChecked = i < checked.size() && checked.get(i);
@@ -518,7 +518,7 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 
 			// 图标
 			ImageView iv = new ImageView(requireContext());
-			iv.setLayoutParams(new LinearLayout.LayoutParams(dp(20), dp(20)));
+			iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 20), NokiaDimens.dp(getResources(), 20)));
 			try {
 				iv.setImageDrawable(ContextCompat.getDrawable(requireContext(),
 						NokiaWidgetItem.getTypeIcon(item.type)));
@@ -528,7 +528,7 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 			row.addView(iv);
 
 			// 间距
-			row.addView(spaceView(dp(6), 1));
+			row.addView(spaceView(NokiaDimens.dp(getResources(), 6), 1));
 
 			// 名称
 			TextView tv = new TextView(requireContext());
@@ -638,7 +638,7 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 			liftedRow.setBackgroundResource(R.drawable.bg_nokia_lifted);
 			LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) liftedRow.getLayoutParams();
 			if (lp != null) {
-				lp.height = dp(40);
+				lp.height = NokiaDimens.dp(getResources(), 40);
 				liftedRow.setLayoutParams(lp);
 			}
 			selectedView = liftedRow;
@@ -646,8 +646,8 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 			View focusRow = itemViews[focusIndex];
 			focusRow.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
 			LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) focusRow.getLayoutParams();
-			if (lp != null && lp.height != dp(34)) {
-				lp.height = dp(34);
+			if (lp != null && lp.height != NokiaDimens.dp(getResources(), 34)) {
+				lp.height = NokiaDimens.dp(getResources(), 34);
 				focusRow.setLayoutParams(lp);
 			}
 			selectedView = focusRow;
@@ -683,9 +683,6 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 	}
 
-	private int dp(int v) {
-		return (int) (v * getResources().getDisplayMetrics().density);
-	}
 
 	private View spaceView(int w, int h) {
 		View v = new View(requireContext());
