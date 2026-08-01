@@ -27,6 +27,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 			R.drawable.s60_gallery,          // 壁纸设置
 			R.drawable.s60_settings_alt,     // 桌面组件设置
 			R.drawable.s60_settings,         // 按键绑定
+			R.drawable.s60_settings,         // 按键绑定向导
 	};
 
 	private static final String[] ITEM_NAMES = {
@@ -34,6 +35,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 			"壁纸设置",
 			"桌面组件设置",
 			"按键绑定",
+			"按键绑定向导",
 	};
 
 	private View[] itemViews;
@@ -169,6 +171,13 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 			case 3:
 				NokiaLog.i("DesktopSettings", "按键绑定");
 				host.openFragment(new NokiaKeyBindFragment());
+				return true;
+			case 4:
+				NokiaLog.i("DesktopSettings", "进入按键绑定向导");
+				host.getSupportFragmentManager().beginTransaction()
+						.replace(R.id.midPanel, new NokiaKeyBindWizardFragment())
+						.addToBackStack(null)
+						.commit();
 				return true;
 			default:
 				return false;

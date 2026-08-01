@@ -7,32 +7,24 @@
     android:orientation="vertical"
     android:background="@drawable/bg_nokia_menu">
 
-    <!-- 标题行 -->
+    <!-- 提示栏（动态切换内容：平常→操作提示 / 冲突→触摸提示） -->
     <LinearLayout
+        android:id="@+id/titleBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
+        android:gravity="center"
         android:paddingStart="8dp"
         android:paddingTop="4dp"
         android:paddingEnd="8dp"
         android:paddingBottom="4dp">
 
         <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="按键绑定设置"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/keyHint"
+            android:id="@+id/titleText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="← 方向键选择, 确认键进入录制"
+            android:text="方向键选择，确认键录制"
             android:textColor="#9fb3d1"
-            android:textSize="8sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 
     <!-- 分隔线 -->

@@ -3,6 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -49,6 +50,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 	private LinearLayout bindListContainer;
 	private LinearLayout recordStatusBar;
 	private TextView recordStatusText;
+	private TextView titleText;
 
 	@Nullable
 	@Override
@@ -98,6 +100,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 		bindListContainer = view.findViewById(R.id.bindListContainer);
 		recordStatusBar = view.findViewById(R.id.recordStatusBar);
 		recordStatusText = view.findViewById(R.id.recordStatusText);
+		titleText = view.findViewById(R.id.titleText);
 
 		// 录制状态栏触摸点击 = 取消当前录制（仅触摸触发跳过，返回键在录制态被忽略）
 		recordStatusBar.setClickable(true);
@@ -270,29 +273,88 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 		setFocusIndex(focusIndex);
 	}
 
-	/** 进入冲突确认模式：复用 Fragment 自身的方向键/确认/返回导航选择覆盖或取消。 */
+	/** 进入冲突确认模式：通过触摸点击"取消"/"覆盖"按钮直接选择，不依赖物理按键。 */
 	private void enterConfirm(int action, int occupied, int keycode) {
 		confirming = true;
 		confirmAction = action;
 		confirmOccupied = occupied;
 		confirmKeycode = keycode;
-		confirmChoice = 0; // 默认选中“取消”，避免误覆盖
+		confirmChoice = -1; // 未选定
 
-		// 底部菜单栏由 NokiaPage 声明动态装配（中间固定显示界面名"按键绑定"，覆盖/取消由左右软键触发）
+		// 底部菜单栏由 NokiaPage 声明动态装配（冲突模式软键不参与，全凭触摸）
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.refreshPageBar();
 
+		// 提示栏切换为冲突提示
+		if (titleText != null) {
+			titleText.setText("按键冲突，请触摸下方按钮选择");
+			titleText.setTextColor(0xFFFFEB3B);
+		}
+
 		recordStatusBar.setVisibility(View.VISIBLE);
+		recordStatusBar.setOnClickListener(null);
+		recordStatusBar.setOnLongClickListener(null);
 		updateConfirmText();
-		NokiaLog.i("KeyBind", "进入冲突确认模式，等待选择（←→切换，确认选定，返回=取消）");
+		NokiaLog.i("KeyBind", "进入冲突确认模式，触摸点击取消/覆盖按钮选择");
 	}
 
 	private void updateConfirmText() {
-		String cancel = (confirmChoice == 0) ? "[取消]" : " 取消 ";
-		String over = (confirmChoice == 1) ? "[覆盖]" : " 覆盖 ";
-		recordStatusText.setText("冲突：" + NokiaLog.keyName(confirmKeycode)
-				+ " 已被「" + NokiaKeyBinding.getActionName(confirmOccupied) + "」占用  "
-				+ cancel + over + "（←→切换，确认选定）");
+		// 不再需要设置文字，buildConfirmButtons 会替换整个状态栏
+		buildConfirmButtons();
+	}
+
+	/** 冲突模式下，动态替换 recordStatusBar 内容为冲突详情 + 两个可点击按钮。 */
+	private void buildConfirmButtons() {
+		recordStatusBar.removeAllViews();
+		recordStatusBar.setOrientation(LinearLayout.HORIZONTAL);
+		recordStatusBar.setGravity(Gravity.CENTER_VERTICAL);
+		int padH = NokiaDimens.dp(getResources(), 8);
+		int padV = NokiaDimens.dp(getResources(), 4);
+		recordStatusBar.setPadding(padH, padV, padH, padV);
+
+		// 冲突详情（弹性占位）
+		TextView tvInfo = new TextView(requireContext());
+		tvInfo.setLayoutParams(new LinearLayout.LayoutParams(
+				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+		tvInfo.setText(NokiaKeyBinding.getActionName(confirmOccupied) + " → "
+				+ NokiaLog.keyName(confirmKeycode));
+		tvInfo.setTextColor(0xFFE0E0E0);
+		tvInfo.setTextSize(10);
+		recordStatusBar.addView(tvInfo);
+
+		// 取消
+		TextView btnCancel = buildConfirmButton("取消", 0xFFF44336, v -> {
+			confirmChoice = 0;
+			doConfirm();
+		});
+		recordStatusBar.addView(btnCancel);
+
+		// 覆盖
+		TextView btnOverwrite = buildConfirmButton("覆盖", 0xFF4CAF50, v -> {
+			confirmChoice = 1;
+			doConfirm();
+		});
+		recordStatusBar.addView(btnOverwrite);
+	}
+
+	/** 创建一个触摸可点击的确认按钮。 */
+	private TextView buildConfirmButton(String text, int color, View.OnClickListener listener) {
+		TextView btn = new TextView(requireContext());
+		int padH = NokiaDimens.dp(getResources(), 8);
+		int padV = NokiaDimens.dp(getResources(), 3);
+		btn.setPadding(padH, padV, padH, padV);
+		btn.setText(text);
+		btn.setTextColor(color);
+		btn.setTextSize(11);
+		btn.setClickable(true);
+		btn.setFocusable(true);
+		btn.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+		btn.setOnClickListener(listener);
+		LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+		lp.setMarginStart(NokiaDimens.dp(getResources(), 4));
+		btn.setLayoutParams(lp);
+		return btn;
 	}
 
 	/** 执行用户的选择并退出确认模式。 */
@@ -314,9 +376,49 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.refreshPageBar();
 
+		// 恢复提示栏文字
+		if (titleText != null) {
+			titleText.setText("方向键选择，确认键录制");
+			titleText.setTextColor(0xFF9FB3D1);
+		}
+
+		// 恢复 recordStatusBar 为原始状态（冲突模式替换了子 View）
+		restoreRecordStatusBar();
 		recordStatusBar.setVisibility(View.GONE);
 		buildList();
 		setFocusIndex(focusIndex);
+	}
+
+	/** 恢复 recordStatusBar 的原始子 View（提示点 + recordStatusText）和录制取消点击行为。 */
+	private void restoreRecordStatusBar() {
+		recordStatusBar.removeAllViews();
+		recordStatusBar.setOrientation(LinearLayout.HORIZONTAL);
+		recordStatusBar.setGravity(Gravity.CENTER_VERTICAL);
+
+		// 提示点
+		View dot = new View(requireContext());
+		dot.setLayoutParams(new LinearLayout.LayoutParams(
+				NokiaDimens.dp(getResources(), 8), NokiaDimens.dp(getResources(), 8)));
+		LinearLayout.LayoutParams dotLp = (LinearLayout.LayoutParams) dot.getLayoutParams();
+		dotLp.setMargins(0, 0, NokiaDimens.dp(getResources(), 6), 0);
+		dot.setBackgroundResource(R.drawable.bg_nokia_selected);
+		recordStatusBar.addView(dot);
+
+		// 录制状态文字
+		recordStatusText = new TextView(requireContext());
+		recordStatusText.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		recordStatusText.setTextColor(0xFF64B5F6);
+		recordStatusText.setTextSize(11);
+		recordStatusText.setTypeface(null, android.graphics.Typeface.BOLD);
+		recordStatusBar.addView(recordStatusText);
+
+		// 录制态：点击取消录制
+		recordStatusBar.setOnClickListener(v -> {
+			NokiaLog.i("KeyBind", "触摸点击录制状态栏 -> 取消录制");
+			onSkipCurrent();
+		});
+		recordStatusBar.setOnLongClickListener(null);
 	}
 
 	/** 供 Activity 查询当前是否在录制模式。 */
@@ -329,14 +431,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 	@Override
 	public boolean onDirection(int direction) {
 		if (confirming) {
-			// 左右切换选择；上下忽略
-			if (direction == NokiaKeyBinding.ACTION_LEFT
-					|| direction == NokiaKeyBinding.ACTION_RIGHT) {
-				confirmChoice = (confirmChoice == 0) ? 1 : 0;
-				updateConfirmText();
-				NokiaLog.d("KeyBind", "冲突确认切换选择 -> "
-						+ (confirmChoice == 0 ? "取消" : "覆盖"));
-			}
+			// 冲突确认模式：纯触摸操作，方向键无作用（消费掉防止穿透）
 			return true;
 		}
 		NokiaLog.d("KeyBind", "onDirection " + NokiaKeyBinding.getActionName(direction)
@@ -360,7 +455,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 	@Override
 	public boolean onSelect() {
 		if (confirming) {
-			doConfirm();
+			// 冲突确认模式：纯触摸操作，按键不触发确认
 			return true;
 		}
 		// 进入防抖：刚进入界面时的残留确认键（触发进入的那个按键的 repeat DOWN）
@@ -381,8 +476,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 	@Override
 	public boolean onSoftLeft() {
 		if (confirming) {
-			confirmChoice = 0;
-			doConfirm();
+			// 冲突确认模式：纯触摸操作，左软键无作用
 			return true;
 		}
 		NokiaLog.d("KeyBind", "onSoftLeft -> 等同选择");
@@ -392,8 +486,7 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 	@Override
 	public boolean onSoftRight() {
 		if (confirming) {
-			confirmChoice = 1;
-			doConfirm();
+			// 冲突确认模式：纯触摸操作，右软键无作用
 			return true;
 		}
 		NokiaLog.d("KeyBind", "onSoftRight -> 返回");
@@ -425,14 +518,14 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 
 	@Override
 	public String getSoftLeftText() {
-		// 覆盖模式：左软键"取消"；列表模式：左软键"选择"
-		return confirming ? "取消" : "选择";
+		// 冲突确认模式：软键不参与，全凭触摸；列表模式：左软键"选择"
+		return confirming ? null : "选择";
 	}
 
 	@Override
 	public String getSoftRightText() {
-		// 覆盖模式：右软键"覆盖"；列表模式：右软键"返回"
-		return confirming ? "覆盖" : "返回";
+		// 冲突确认模式：软键不参与，全凭触摸；列表模式：右软键"返回"
+		return confirming ? null : "返回";
 	}
 
 	// ---- 焦点管理 ----
