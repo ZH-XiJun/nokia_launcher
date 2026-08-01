@@ -12,6 +12,7 @@ import androidx.fragment.app.FragmentManager;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
+import ru.playsoftware.j2meloader.nokia.NokiaLog;
 
 /**
  * 诺基亚风格界面的单一宿主 Activity。
@@ -67,6 +68,28 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	/** 暴露当前按键绑定实例，供 Fragment 读取（如桌面锁屏按钮展示已绑定键名）。 */
 	public NokiaKeyBinding getKeyBinding() {
 		return keyBinding;
+	}
+
+	/**
+	 * 重新读取当前页面的 {@link NokiaPage} 声明并装配底部菜单栏。
+	 * <p>
+	 * 页面切到前台（onViewCreated / onResume）或内部状态变化（焦点、mode、覆盖模式、向导步骤）
+	 * 后调用本方法，替代原来各 Fragment 各自写死 setBottomBar / 直接操作底部 TextView 的散乱写法。
+	 */
+	public void refreshPageBar() {
+		Fragment f = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+		if (f instanceof NokiaPage) {
+			NokiaPage page = (NokiaPage) f;
+			String left = page.getSoftLeftText();
+			String center = page.getPageTitle();
+			String right = page.getSoftRightText();
+			NokiaLog.d("Desktop", "refreshPageBar 装配 " + f.getClass().getSimpleName()
+					+ " left=" + left + " center=" + center + " right=" + right);
+			setBottomBar(left, center, right);
+		} else {
+			NokiaLog.d("Desktop", "refreshPageBar: 当前 Fragment 未实现 NokiaPage（"
+					+ (f != null ? f.getClass().getSimpleName() : "null") + "），忽略");
+		}
 	}
 
 	// ---- 生命周期 ----

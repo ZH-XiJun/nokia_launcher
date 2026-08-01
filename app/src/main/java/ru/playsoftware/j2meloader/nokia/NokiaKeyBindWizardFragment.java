@@ -27,7 +27,7 @@ import ru.playsoftware.j2meloader.R;
  * 仅首次启动弹出（由 NokiaKeyBinding.isWizardDone 控制，清数据后重置）。
  * 整个流程完全由物理按键驱动，复用 NokiaKeyRecorder 的录制捕获机制。
  */
-public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHost, NokiaKeyRecorder {
+public class NokiaKeyBindWizardFragment extends Fragment implements NokiaPage, NokiaKeyRecorder {
 
 	private static final int STATE_INTRO = 0;
 	private static final int STATE_RECORDING = 1;
@@ -68,11 +68,8 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
 
-		// 顶部标题
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("按键绑定向导");
-		}
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
+		host.refreshPageBar();
 
 		introCard = view.findViewById(R.id.introCard);
 		recordingLayout = view.findViewById(R.id.recordingLayout);
@@ -115,7 +112,7 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 		updateIntroHighlight();
 		if (stepBadge != null) stepBadge.setText("");
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.setBottomBar("绑定", null, "跳过");
+		host.refreshPageBar();
 		NokiaLog.i("KeyWizard", "进入 INTRO 弹窗（绑定/跳过）");
 	}
 
@@ -132,7 +129,7 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 		doneLayout.setVisibility(View.GONE);
 		// 录制态下任意键都会被捕获为当前动作的绑定键，底部栏隐藏
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.setBottomBar(null, null, null);
+		host.refreshPageBar();
 		updateRecordingPrompt();
 		NokiaLog.i("KeyWizard", "开始录制，第 1 项="
 				+ NokiaKeyBinding.getWizardPromptName(0));
@@ -201,7 +198,7 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 		recordingLayout.setVisibility(View.GONE);
 		doneLayout.setVisibility(View.VISIBLE);
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.setBottomBar(null, null, null);
+		host.refreshPageBar();
 		if (stepBadge != null) stepBadge.setText("");
 		// 标记向导已完成，下次启动不再弹出
 		keyBinding.markWizardDone();
@@ -266,5 +263,24 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaFocusHo
 		NokiaLog.i("KeyWizard", "返回键 -> 跳过");
 		finishWizard(false);
 		return true;
+	}
+
+	// ---- NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配） ----
+
+	@Override
+	public String getPageTitle() {
+		return "按键绑定向导";
+	}
+
+	@Override
+	public String getSoftLeftText() {
+		// 仅 INTRO 显示"绑定"；录制/DONE 全部隐藏
+		return state == STATE_INTRO ? "绑定" : null;
+	}
+
+	@Override
+	public String getSoftRightText() {
+		// 仅 INTRO 显示"跳过"；录制/DONE 全部隐藏
+		return state == STATE_INTRO ? "跳过" : null;
 	}
 }

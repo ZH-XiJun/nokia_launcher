@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 共用的诺基亚底部软键栏：三页复用，内层 240dp 内容由基类按比例缩放。
-     左/中/右三个文本由每个页面在运行时设置（文字与点击行为）。 -->
+     左/中/右三个文本由每个页面在运行时设置（文字与点击行为）。
+     注意：三栏固定 weight=1 平分宽度，空文本时由代码用 INVISIBLE 隐藏
+     （保留占位，保证中间标题始终居中；INVISIBLE 也不接收触摸，避免空按钮误触）。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/bottomPanel"
     android:layout_width="match_parent"
@@ -22,6 +24,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="start"
+            android:singleLine="true"
+            android:ellipsize="end"
             android:textColor="#64b5f6"
             android:textSize="11sp" />
 
@@ -31,6 +35,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
+            android:singleLine="true"
+            android:ellipsize="middle"
             android:textColor="#FFFFFF"
             android:textSize="12sp"
             android:textStyle="bold" />
@@ -41,6 +47,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="end"
+            android:singleLine="true"
+            android:ellipsize="end"
             android:textColor="#64b5f6"
             android:textSize="11sp" />
     </LinearLayout>

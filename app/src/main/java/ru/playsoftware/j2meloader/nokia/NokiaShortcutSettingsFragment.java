@@ -41,7 +41,7 @@ import ru.playsoftware.j2meloader.config.Config;
  * 快捷栏应用选择界面。展示所有可选应用（安卓 + J2ME），多选后保存。
  * 支持方向键导航，SELECT 切换选中状态，左软键保存，右软键返回。
  */
-public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocusHost {
+public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage {
 
 	private LinearLayout appListLayout;
 	private ScrollView appScroll;
@@ -70,11 +70,8 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 		if (wall != null) {
 			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("快捷栏设置");
-		}
-		host.setBottomBar(null, null, "返回");
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
+		host.refreshPageBar();
 
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 		appListLayout = view.findViewById(R.id.appListLayout);
@@ -479,6 +476,23 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaFocu
 	public boolean onBack() {
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
+	}
+
+	// ---- NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配） ----
+
+	@Override
+	public String getPageTitle() {
+		return "快捷栏设置";
+	}
+
+	@Override
+	public String getSoftLeftText() {
+		return null;
+	}
+
+	@Override
+	public String getSoftRightText() {
+		return "返回";
 	}
 
 	// ---- 焦点管理 ----

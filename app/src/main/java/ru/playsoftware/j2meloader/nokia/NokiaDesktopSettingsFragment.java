@@ -20,7 +20,7 @@ import ru.playsoftware.j2meloader.R;
  * 桌面设置主菜单。纵向列表展示各项设置入口。
  * 支持方向键导航（实现 NokiaFocusHost），风格延续 S60 菜单。
  */
-public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocusHost {
+public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage {
 
 	private static final int[] ITEM_ICONS = {
 			R.drawable.ic_nokia_settings,   // 快捷栏设置
@@ -57,11 +57,8 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 		if (wall != null) {
 			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("桌面设置");
-		}
-		host.setBottomBar("选择", null, "返回");
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
+		host.refreshPageBar();
 
 		// 构建设置列表
 		LinearLayout listLayout = view.findViewById(R.id.settingsList);
@@ -194,6 +191,23 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 	public boolean onBack() {
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
+	}
+
+	// ---- NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配） ----
+
+	@Override
+	public String getPageTitle() {
+		return "桌面设置";
+	}
+
+	@Override
+	public String getSoftLeftText() {
+		return "选择";
+	}
+
+	@Override
+	public String getSoftRightText() {
+		return "返回";
 	}
 
 	// ---- 焦点管理 ----

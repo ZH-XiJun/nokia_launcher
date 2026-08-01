@@ -22,7 +22,7 @@ import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
  * 列出所有 8 个动作及对应按键，支持方向键导航选中 + 确认键进入录制模式，
  * 按下任意物理键即完成绑定。
  */
-public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, NokiaKeyRecorder {
+public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKeyRecorder {
 
 	private NokiaKeyBinding keyBinding;
 	private View[] itemViews = new View[NokiaKeyBinding.ACTION_COUNT];
@@ -73,24 +73,8 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
 
-		// 标题
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("按键绑定");
-		}
-
-		// 底部软键
-		TextView bl = host.findViewById(R.id.bottomLeft);
-		if (bl != null) bl.setText("选择");
-		TextView bc = host.findViewById(R.id.bottomCenter);
-		if (bc != null) bc.setText("");
-		TextView br = host.findViewById(R.id.bottomRight);
-		if (br != null) {
-			br.setText("返回");
-			br.setOnClickListener(v -> host.exitCurrent());
-		}
-		// 按键绑定列表页：左"选择" / 右"返回"，中间空 → 自动隐藏避免蓝色块
-		host.setBottomBar("选择", null, "返回");
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
+		host.refreshPageBar();
 
 		buildList();
 
@@ -253,15 +237,9 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		confirmKeycode = keycode;
 		confirmChoice = 0; // 默认选中“取消”，避免误覆盖
 
-		// 更新底部软键提示（若软键已绑定则可用，否则用方向键/确认同样可行）
+		// 底部菜单栏由 NokiaPage 声明动态装配（中间固定显示界面名"按键绑定"，覆盖/取消由左右软键触发）
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		TextView bl = host.findViewById(R.id.bottomLeft);
-		if (bl != null) bl.setText("取消");
-		TextView br = host.findViewById(R.id.bottomRight);
-		if (br != null) br.setText("覆盖");
-		TextView bc = host.findViewById(R.id.bottomCenter);
-		if (bc != null) bc.setText("选择");
-		host.setBottomBar("取消", "选择", "覆盖");
+		host.refreshPageBar();
 
 		recordStatusBar.setVisibility(View.VISIBLE);
 		updateConfirmText();
@@ -291,15 +269,9 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		confirming = false;
 		confirmAction = confirmKeycode = confirmOccupied = -1;
 
-		// 恢复底部软键文案
+		// 底部菜单栏由 NokiaPage 声明动态装配（恢复列表页左右软键文案）
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		TextView bl = host.findViewById(R.id.bottomLeft);
-		if (bl != null) bl.setText("选择");
-		TextView br = host.findViewById(R.id.bottomRight);
-		if (br != null) br.setText("返回");
-		TextView bc = host.findViewById(R.id.bottomCenter);
-		if (bc != null) bc.setText("");
-		host.setBottomBar("选择", null, "返回");
+		host.refreshPageBar();
 
 		recordStatusBar.setVisibility(View.GONE);
 		buildList();
@@ -392,6 +364,26 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaFocusHost, No
 		NokiaLog.d("KeyBind", "onBack -> 返回");
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
+	}
+
+	// ---- NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配） ----
+
+	@Override
+	public String getPageTitle() {
+		// 覆盖模式中间固定显示界面名"按键绑定"（不再当按钮）
+		return "按键绑定";
+	}
+
+	@Override
+	public String getSoftLeftText() {
+		// 覆盖模式：左软键"取消"；列表模式：左软键"选择"
+		return confirming ? "取消" : "选择";
+	}
+
+	@Override
+	public String getSoftRightText() {
+		// 覆盖模式：右软键"覆盖"；列表模式：右软键"返回"
+		return confirming ? "覆盖" : "返回";
 	}
 
 	// ---- 焦点管理 ----

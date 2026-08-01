@@ -32,7 +32,7 @@ import ru.playsoftware.j2meloader.R;
  * 「使用时长」依赖 UsageStatsManager（API 21+），Android 4.4 及以下显示为灰色、
  * 光标跳过、确认键无响应。
  */
-public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaFocusHost {
+public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage {
 
 	private static final String TAG = "WidgetTypePicker";
 
@@ -73,11 +73,8 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaFocu
 		if (wall != null) {
 			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("选择组件类型");
-		}
-		host.setBottomBar(null, null, "返回");
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
+		host.refreshPageBar();
 
 		storage = new NokiaWidgetStorage(requireContext());
 		listLayout = view.findViewById(R.id.typeListLayout);
@@ -243,6 +240,23 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaFocu
 	public boolean onBack() {
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
+	}
+
+	// ---- NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配） ----
+
+	@Override
+	public String getPageTitle() {
+		return "选择组件类型";
+	}
+
+	@Override
+	public String getSoftLeftText() {
+		return null;
+	}
+
+	@Override
+	public String getSoftRightText() {
+		return "返回";
 	}
 
 	// ---- 类型选择后的跳转 ----

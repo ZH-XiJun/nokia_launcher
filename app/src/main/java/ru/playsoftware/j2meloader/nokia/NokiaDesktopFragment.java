@@ -34,7 +34,7 @@ import ru.playsoftware.j2meloader.config.Config;
  * 支持方向键在快捷应用栏（动态数量）、通知区（3 项）和功能表按钮之间导航。
  * 快捷栏应用由用户在桌面设置中配置，动态加载并支持左右滚动。
  */
-public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
+public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 	private final List<View> focusTargets = new ArrayList<>();
 	private final List<ShortcutApp> shortcutApps = new ArrayList<>();
@@ -91,20 +91,8 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 		if (wall != null) {
 			wall.setBackgroundResource(R.drawable.bg_nokia_desktop);
 		}
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("");
-		}
-		TextView bl = host.findViewById(R.id.bottomLeft);
-		if (bl != null) {
-			bl.setOnClickListener(v -> host.openMenu());
-		}
-		TextView br = host.findViewById(R.id.bottomRight);
-		if (br != null) {
-			br.setOnClickListener(v -> host.openDesktopSettings());
-		}
-		// 通过 setBottomBar 统一设置文字与可见性，避免从向导/其它页返回后文字消失
-		host.setBottomBar("功能表", "", "桌面设置");
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配（左右触摸由 Activity bindBottomBarTouch 统一处理）
+		host.refreshPageBar();
 
 		// 清空上一轮的焦点状态，避免旧 View 遗留导致导航错乱或崩溃
 		focusTargets.clear();
@@ -146,7 +134,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 	public void onResume() {
 		super.onResume();
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.setBottomBar("功能表", "", "桌面设置");
+		host.refreshPageBar();
 		// 从桌面设置改完键返回后，刷新锁屏按钮的键名提示
 		refreshLockScreenHint(host);
 		NokiaLog.d("Desktop", "桌面 onResume 同步底部栏");
@@ -385,6 +373,24 @@ public class NokiaDesktopFragment extends Fragment implements NokiaFocusHost {
 	public boolean onBack() {
 		// 桌面不处理返回，由 Activity 处理（回到 Android Home）
 		return false;
+	}
+
+	// ---- NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配） ----
+
+	@Override
+	public String getPageTitle() {
+		// 桌面场景底部中间留空
+		return null;
+	}
+
+	@Override
+	public String getSoftLeftText() {
+		return "功能表";
+	}
+
+	@Override
+	public String getSoftRightText() {
+		return "桌面设置";
 	}
 
 	// ---- 导航逻辑 ----

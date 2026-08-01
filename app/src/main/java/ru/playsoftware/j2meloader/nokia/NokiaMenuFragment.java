@@ -35,7 +35,7 @@ import ru.playsoftware.j2meloader.R;
  * 方向键在页内移动焦点：左/右到边界时翻到上/下一页；确认键启动对应 APP。
  * 末尾追加「百宝箱」「按键绑定」两个特殊入口，保留原功能可达性。
  */
-public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
+public class NokiaMenuFragment extends Fragment implements NokiaPage {
 
 	/**
 	 * 第一页固定槽位（参照诺基亚 S60 功能表布局）。
@@ -138,19 +138,8 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 		if (wall != null) {
 			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("");
-		}
-		// 功能表页：左"选择"、右"退出"，中间按钮隐藏避免蓝色空块
-		TextView bl = host.findViewById(R.id.bottomLeft);
-		if (bl != null) bl.setText("选择");
-		TextView br = host.findViewById(R.id.bottomRight);
-		if (br != null) {
-			br.setText("退出");
-			br.setOnClickListener(v -> host.exitCurrent());
-		}
-		host.setBottomBar("选择", null, "退出");
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配（左右触摸由 Activity bindBottomBarTouch 统一处理）
+		host.refreshPageBar();
 
 		appGrid = view.findViewById(R.id.appGrid);
 		tvPage = view.findViewById(R.id.menuPage);
@@ -621,6 +610,23 @@ public class NokiaMenuFragment extends Fragment implements NokiaFocusHost {
 	public boolean onBack() {
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
+	}
+
+	// ---- NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配） ----
+
+	@Override
+	public String getPageTitle() {
+		return "功能表";
+	}
+
+	@Override
+	public String getSoftLeftText() {
+		return "选择";
+	}
+
+	@Override
+	public String getSoftRightText() {
+		return "退出";
 	}
 
 	// ---- 内部逻辑 ----

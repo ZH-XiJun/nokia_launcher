@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
@@ -169,35 +170,50 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	}
 
 	/**
-	 * 设置底部栏三按钮文字。文字为空时自动隐藏对应 TextView，
-	 * 剩余按钮按 weight 平分剩余空间，避免底部出现空蓝色块。
+	 * 设置底部栏三按钮文字。文字为空时用 INVISIBLE 隐藏对应 TextView：
+	 * INVISIBLE 保留占位（三栏 weight 布局宽度不变），保证中间标题始终居中，
+	 * 且 INVISIBLE 的 View 不接收触摸，避免空按钮误触。
+	 * 中间标题按字符数自动缩字号，长名称（如「桌面组件设置」）也能完整显示。
 	 * 各碎片切到前台时都应调用一次，保证显示状态同步。
 	 */
 	protected void setBottomBar(String left, String center, String right) {
-		applyBottomText(findViewById(R.id.bottomLeft), left);
-		applyBottomText(findViewById(R.id.bottomCenter), center);
-		applyBottomText(findViewById(R.id.bottomRight), right);
+		applyBottomText(findViewById(R.id.bottomLeft), left, false);
+		applyBottomText(findViewById(R.id.bottomCenter), center, true);
+		applyBottomText(findViewById(R.id.bottomRight), right, false);
 	}
 
-	private void applyBottomText(TextView tv, String text) {
+	private void applyBottomText(TextView tv, String text, boolean isCenter) {
 		if (tv == null) return;
 		if (text == null || text.isEmpty()) {
-			tv.setVisibility(View.GONE);
+			tv.setVisibility(View.INVISIBLE);
 		} else {
 			tv.setText(text);
+			if (isCenter) {
+				// 长界面名动态缩字号：≤4 字 12sp，5-6 字 11sp，≥7 字 10sp
+				int len = text.length();
+				float size;
+				if (len <= 4) {
+					size = 12f;
+				} else if (len <= 6) {
+					size = 11f;
+				} else {
+					size = 10f;
+				}
+				tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, size);
+			}
 			tv.setVisibility(View.VISIBLE);
 		}
 	}
 
 	/**
-	 * 设置底部栏中间按钮的文字。文字为空时自动隐藏，避免底部中间出现空蓝色块。
+	 * 设置底部栏中间按钮的文字。文字为空时用 INVISIBLE 隐藏（保留占位保证居中）。
 	 * 各碎片切到前台时都应调用一次，保证显示状态同步。
 	 */
 	protected void setBottomCenterText(String text) {
 		TextView bc = findViewById(R.id.bottomCenter);
 		if (bc == null) return;
 		if (text == null || text.isEmpty()) {
-			bc.setVisibility(View.GONE);
+			bc.setVisibility(View.INVISIBLE);
 		} else {
 			bc.setText(text);
 			bc.setVisibility(View.VISIBLE);

@@ -43,7 +43,7 @@ import ru.woesss.j2me.installer.NokiaInstallerDialog;
  * 确认键直接启动应用，左软键弹出选项菜单（启动/设置/卸载）。
  * 方向键导航，复用 J2ME-Loader 原有的安装与启动逻辑。
  */
-public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
+public class NokiaBoxFragment extends Fragment implements NokiaPage {
 
 	// ---- 网格常量 ----
 	private static final int COLS = 3;
@@ -108,11 +108,8 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 		if (wall != null) {
 			wall.setBackgroundResource(R.drawable.bg_nokia_box);
 		}
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("应用程序");
-		}
-		host.setBottomBar("选项", null, "退出");
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
+		host.refreshPageBar();
 
 		appScroll = view.findViewById(R.id.appScroll);
 		appContainer = view.findViewById(R.id.appContainer);
@@ -478,25 +475,23 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	 */
 	private void showAppOptionsMenu(AppItem app) {
 		NokiaLog.i("Box", "弹出选项菜单: " + app.getTitle());
-		NokiaAppOptionsDialog dialog = NokiaAppOptionsDialog.newInstance(app.getTitle());
-		dialog.setOptionsListener(new NokiaAppOptionsDialog.OptionsListener() {
-			@Override
-			public void onLaunch() {
-				NokiaLog.i("Box", "选项菜单-启动: " + app.getTitle());
-				Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
-			}
-			@Override
-			public void onSettings() {
-				NokiaLog.i("Box", "选项菜单-设置: " + app.getTitle());
-				Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), true);
-			}
-			@Override
-			public void onUninstall() {
-				NokiaLog.i("Box", "选项菜单-卸载: " + app.getTitle());
-				showUninstallDialog(app);
-			}
-		});
-		dialog.show(getParentFragmentManager(), "app_options");
+		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_media_play,
+				"启动", true, false, () -> {
+			NokiaLog.i("Box", "选项菜单-启动: " + app.getTitle());
+			Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
+		}));
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_manage,
+				"设置", true, false, () -> {
+			NokiaLog.i("Box", "选项菜单-设置: " + app.getTitle());
+			Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), true);
+		}));
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
+				"卸载", true, false, () -> {
+			NokiaLog.i("Box", "选项菜单-卸载: " + app.getTitle());
+			showUninstallDialog(app);
+		}));
+		NokiaOptionsDialog.show(getParentFragmentManager(), app.getTitle(), items);
 	}
 
 	// ============================
@@ -531,18 +526,12 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	// ============================
 
 	/**
-	 * 根据当前焦点动态更新底部软键文字。
+	 * 根据当前焦点动态更新底部软键文字（由 NokiaPage getter 决定，这里只通知 Activity 重新装配）。
 	 * 选中"安装"或"JAR全局设置"时，左软键文字隐藏；选中 JAR 应用时显示"选项"。
 	 */
 	private void updateSoftKeys() {
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		if (focusIndex >= 2) {
-			// JAR 应用 → 左软键显示"选项"
-			host.setBottomBar("选项", null, "退出");
-		} else {
-			// 安装 / JAR全局设置 → 左软键文字隐藏
-			host.setBottomBar(null, null, "退出");
-		}
+		host.refreshPageBar();
 	}
 
 	// ============================
@@ -574,6 +563,26 @@ public class NokiaBoxFragment extends Fragment implements NokiaFocusHost {
 	public boolean onBack() {
 		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
+	}
+
+	// ============================
+	// NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配）
+	// ============================
+
+	@Override
+	public String getPageTitle() {
+		return "应用程序";
+	}
+
+	@Override
+	public String getSoftLeftText() {
+		// JAR 应用（focusIndex >= 2）→ 左软键"选项"；安装/JAR全局设置 → 隐藏
+		return focusIndex >= 2 ? "选项" : null;
+	}
+
+	@Override
+	public String getSoftRightText() {
+		return "退出";
 	}
 
 	// ============================

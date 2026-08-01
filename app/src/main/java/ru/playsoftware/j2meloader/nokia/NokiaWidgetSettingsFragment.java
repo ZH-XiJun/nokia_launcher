@@ -30,7 +30,7 @@ import ru.playsoftware.j2meloader.R;
  * S2 选项菜单与 S3 删除子菜单均为底部弹出的 DialogFragment
  * （样式与「功能表→应用程序→选中JAR的选项菜单」一致），弹窗内已接入 NokiaKeyBinding。
  */
-public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusHost {
+public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 
 	private static final String TAG = "WidgetSettings";
 
@@ -76,10 +76,8 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 		if (wall != null) {
 			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
 		}
-		TextView title = host.findViewById(R.id.topTitle);
-		if (title != null) {
-			title.setText("桌面组件设置");
-		}
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
+		host.refreshPageBar();
 
 		storage = new NokiaWidgetStorage(requireContext());
 		listLayout = view.findViewById(R.id.widgetListLayout);
@@ -214,6 +212,37 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 		}
 	}
 
+	// ---- NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配） ----
+
+	@Override
+	public String getPageTitle() {
+		return "桌面组件设置";
+	}
+
+	@Override
+	public String getSoftLeftText() {
+		switch (mode) {
+			case MODE_DELETE:
+				return "选项";
+			case MODE_SORT:
+				return "完成";
+			default:
+				return "选项";
+		}
+	}
+
+	@Override
+	public String getSoftRightText() {
+		switch (mode) {
+			case MODE_DELETE:
+				return "取消";
+			case MODE_SORT:
+				return null; // 排序模式右软键无按钮
+			default:
+				return "返回";
+		}
+	}
+
 	// ---- S1 确认键行为 ----
 
 	private void onConfirmWidget() {
@@ -236,29 +265,14 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 		boolean canAdd = widgets.size() < NokiaWidgetItem.MAX_COUNT;
 		boolean canDelete = !widgets.isEmpty();
 		boolean canSort = widgets.size() > 1;
-		NokiaWidgetOptionsDialog dialog = NokiaWidgetOptionsDialog.newInstance(
-				"选项",
-				new String[]{"添加组件", "删除组件", "组件排序"},
-				new boolean[]{canAdd, canDelete, canSort},
-				new int[]{android.R.drawable.ic_menu_add,
-						android.R.drawable.ic_menu_delete,
-						android.R.drawable.ic_menu_sort_by_size});
-		dialog.setOptionsListener(index -> {
-			switch (index) {
-				case 0:
-					openTypePicker();
-					break;
-				case 1:
-					enterDeleteMode();
-					break;
-				case 2:
-					enterSortMode();
-					break;
-				default:
-					break;
-			}
-		});
-		dialog.show(getParentFragmentManager(), "widget_options");
+		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_add,
+				"添加组件", canAdd, false, this::openTypePicker));
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
+				"删除组件", canDelete, false, this::enterDeleteMode));
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_sort_by_size,
+				"组件排序", canSort, false, this::enterSortMode));
+		NokiaOptionsDialog.show(getParentFragmentManager(), "选项", items);
 		NokiaLog.i(TAG, "弹出选项菜单弹窗: canAdd=" + canAdd + " canDelete=" + canDelete + " canSort=" + canSort);
 	}
 
@@ -281,30 +295,29 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 	}
 
 	private void showDeleteDialog() {
-		NokiaWidgetDeleteDialog dialog = new NokiaWidgetDeleteDialog();
-		dialog.setListener(new NokiaWidgetDeleteDialog.Listener() {
-			@Override
-			public void onSelectAllToggle() {
-				toggleSelectAll();
-			}
-
-			@Override
-			public void onDeleteSelected() {
-				deleteSelected();
-			}
-
-			@Override
-			public boolean isAllChecked() {
-				return allChecked();
-			}
-
-			@Override
-			public int getCheckedCount() {
-				return checkedCount();
-			}
-		});
-		dialog.show(getParentFragmentManager(), "widget_delete");
+		// 全选/取消全选项 keepOpen=true，点击后不关闭并刷新文案（删除已选按钮计数随之更新）
+		final NokiaOptionsDialog[] holder = new NokiaOptionsDialog[1];
+		List<NokiaOptionsDialog.OptionItem> items = buildDeleteDialogItems(holder);
+		holder[0] = NokiaOptionsDialog.show(getParentFragmentManager(), "删除", items);
 		NokiaLog.i(TAG, "弹出删除子菜单弹窗");
+	}
+
+	private List<NokiaOptionsDialog.OptionItem> buildDeleteDialogItems(final NokiaOptionsDialog[] holder) {
+		boolean all = allChecked();
+		int count = checkedCount();
+		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
+		items.add(new NokiaOptionsDialog.OptionItem(0,
+				all ? "取消全选" : "全选",
+				true, true, () -> {
+			toggleSelectAll();
+			// 保持弹窗打开，动态刷新全选文案与删除计数
+			if (holder[0] != null) {
+				holder[0].setItems(buildDeleteDialogItems(holder));
+			}
+		}));
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
+				"删除已选(" + count + ")", count > 0, false, this::deleteSelected));
+		return items;
 	}
 
 	private void toggleChecked(int index) {
@@ -578,18 +591,9 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 	}
 
 	private void updateBottomBar() {
+		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配（按 mode 动态取值）
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		switch (mode) {
-			case MODE_DELETE:
-				host.setBottomBar("选项", null, "取消");
-				break;
-			case MODE_SORT:
-				host.setBottomBar("完成", null, null);
-				break;
-			default:
-				host.setBottomBar("选项", null, "返回");
-				break;
-		}
+		host.refreshPageBar();
 	}
 
 	// ---- 焦点管理 ----

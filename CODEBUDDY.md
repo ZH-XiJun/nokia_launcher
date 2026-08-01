@@ -111,6 +111,57 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 - 凡是底部只有左右两个软键的弹窗，一律照此处理，不要再写回高亮 / 焦点代码。
 
 
+## 底部菜单栏与界面名规范（重要）
+
+**所有页面统一为「顶部无标题 + 底部菜单栏（左软键 / 中间界面名 / 右软键）」结构，页面自身禁止直接操作底部栏的三个 TextView，统一走声明式装配。**
+
+背景与原因：
+
+1. 早期各 Fragment 各自写死 `setBottomBar(...)`、直接 `findViewById(R.id.bottomLeft)` 等，散乱且易出错。现已在 `ru.playsoftware.j2meloader.nokia.NokiaPage` 接口上收敛为统一契约。
+2. 底部栏三栏是 `layout_width="0dp" + layout_weight="1"` 平分宽度的布局（`nokia_bottom_bar.xml`）。某栏文字为空时**必须用 `View.INVISIBLE` 隐藏，禁止用 `View.GONE`**：
+   - `GONE` 会释放占位宽度 → 剩余两栏重新平分 → 中间界面名会偏移到空位一侧（真实踩过的 bug）；
+   - `INVISIBLE` 保留占位宽度（三栏宽度不变），中间标题**始终居中**，且 INVISIBLE 的 View 不接收触摸，不会误触。
+3. 界面名可能较长（如「桌面组件设置」），固定字号在 240px 宽的小屏上显示不全。处理方式是**按字符数动态缩字号 + 单行省略号兜底**（已在 `NokiaBaseActivity.applyBottomText` 实现），不要再另想换行/截断字符串的方案。
+
+正确做法：
+
+- **声明式装配（NokiaPage）**：
+  - 页面实现 `NokiaPage` 接口（extends `NokiaFocusHost`），提供三个可动态取值的 getter：`getPageTitle()`（中间界面名）、`getSoftLeftText()`（左软键）、`getSoftRightText()`（右软键），**返回 null 表示隐藏该栏**（如桌面中间留空、组件类型选择页左软键为空）。
+  - `NokiaDesktopActivity.refreshPageBar()` 通过 `findFragmentById(R.id.midPanel)` 取当前顶层 Fragment，若实现 `NokiaPage` 则自动调用 `setBottomBar(左, 中, 右)` 装配。
+  - Fragment 在 `onViewCreated` / `onResume` 以及内部状态变化（焦点变化、mode 切换、覆盖模式、向导步骤切换等）后调用 `host.refreshPageBar()` 重新装配。
+- **动态字号规则**（`NokiaBaseActivity.applyBottomText`，只对中间界面名生效）：`≤4 字 12sp`、`5-6 字 11sp`、`≥7 字 10sp`。
+- **省略号兜底**：三个 TextView 均 `singleLine="true"`；中间栏 `ellipsize="middle"`，左右栏 `ellipsize="end"`（已写在 `nokia_bottom_bar.xml`）。
+- **禁止**：在 Fragment 里直接 `findViewById(R.id.bottomLeft / bottomCenter / bottomRight)` 改文字/可见性；用 `View.GONE` 隐藏空栏；给中间标题加换行或多行。
+- 桌面场景：中间界面名为空，顶部也不显示标题（`nokia_top_bar.xml` 已删除 topTitle）。
+
+
+## 选项弹窗规范（NokiaOptionsDialog）（重要）
+
+**所有「选项 / 菜单列表」类弹窗一律使用 `NokiaOptionsDialog`（完整版），它是唯一的通用选项弹窗组件，旧弹窗类已删除，禁止再新建同类弹窗。**
+
+背景与原因：
+
+1. 早期有 `NokiaAppOptionsDialog` / `NokiaWidgetOptionsDialog` / `NokiaWidgetDeleteDialog` 三个各自为政的弹窗，能力不全且行为不一致。现统一收敛为 `NokiaOptionsDialog`（复用 `dialog_nokia_widget_options.xml` 布局），旧类与旧布局已删除。
+2. 弹窗是独立 Window，`NokiaDesktopActivity.dispatchKeyEvent` 对其无效，弹窗必须自己接入 `NokiaKeyBinding`（见「按键处理规范」），禁止写死 keyCode。
+3. 弹窗底部左右软键同样禁止加高亮 / 焦点逻辑（见「软键栏规范」）。
+
+数据模型 `OptionItem`（`NokiaOptionsDialog.OptionItem`）：
+
+- `icon`：图标资源 id，`0` 表示无图标。
+- `label`：选项文案（通过 `setItems()` 可整体替换刷新）。
+- `enabled`：`false` = 灰色不可选，方向键导航自动跳过。
+- `keepOpen`：`true` = 点击后不关闭弹窗（用于全选 / 取消全选后刷新文案）。
+- `action`：点击动作（`Runnable`）。
+
+正确做法：
+
+- 打开：`NokiaOptionsDialog.show(fm, title, items)`，返回实例以便后续刷新。
+- 动态刷新：宿主在选项动作里更新数据后调用 `dialog.setItems(newItems)`，重建列表容器并修正焦点（跳过禁用项），**不重新膨胀整个布局**。
+- 交互语义：点击已启用项执行 `action`；`keepOpen=false` 的项执行后自动 `dismiss()`；`keepOpen=true` 的项（全选/取消全选）执行后不关闭，配合 `setItems()` 刷新。
+- 按键：`onCreate` 里通过 `((NokiaDesktopActivity) requireActivity()).getKeyBinding()` 取得真实绑定，`setOnKeyListener` 内先 `keyBinding.resolveAction(event)` 解析成语义动作再分发；`KEYCODE_BACK` 由弹窗单独处理关闭。
+- **禁止**：新建/复用旧弹窗类或旧布局 `dialog_nokia_app_options.xml`；写死 keyCode；给软键加高亮/焦点；点击选项后无法刷新文案。
+
+
 ## Android 4.4 (API 19) 兼容性踩坑
 
 1. **矢量图 / drawable 膨胀**：4.4 的 `Resources` 在膨胀含特定 `vectorDrawables` 或 drawable 的布局时易抛 `InflateException` / `invalid drawable`。涉及顶栏、桌面背景等图形资源时，优先用兼容写法（如 `AppCompat` 矢量、或自定义 `Drawable`）；构建侧已开启 `vectorDrawables.useSupportLibrary`。

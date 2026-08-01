@@ -4,7 +4,7 @@
      仅高度按设计比例(TOP_H*scale)放大，由代码设置。内层宽度铺满屏幕。
      顶部第一行：左侧图标簇(SIM1/SIM2 信号 + WiFi + 蓝牙 + 飞行模式)；右侧电池和时钟。
      顶部第二行：双卡运营商名(无 SIM 时隐藏)。
-     标题(topTitle)由每个页面在运行时设置（顶部第一行居中位置）。 -->
+     界面名统一显示在底部菜单栏中间，顶部不再显示标题。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/topPanel"
@@ -106,20 +106,6 @@
                 app:srcCompat="@drawable/ic_nokia_airplane"
                 android:visibility="gone" />
         </LinearLayout>
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <TextView
-            android:id="@+id/topTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=""
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
 
         <View
             android:layout_width="0dp"
