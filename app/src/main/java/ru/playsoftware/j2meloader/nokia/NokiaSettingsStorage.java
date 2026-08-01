@@ -7,6 +7,8 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 
 import org.json.JSONArray;
@@ -66,7 +68,12 @@ public class NokiaSettingsStorage {
 			{"com.spotify.music", "Spotify"},
 	};
 
-	/** 获取已选择的快捷栏应用列表 */
+	/** 快捷栏配置异步加载完成回调（均在主线程回调） */
+	public interface OnShortcutAppsLoaded {
+		void onLoaded(List<ShortcutApp> apps);
+	}
+
+	/** 获取已选择的快捷栏应用列表（同步，仅读 SharedPreferences / 首次同步构建，供设置页等非冷启动路径使用） */
 	public List<ShortcutApp> getShortcutApps() {
 		List<ShortcutApp> result = new ArrayList<>();
 		String json = prefs.getString(KEY_SHORTCUT_APPS, null);
@@ -77,7 +84,49 @@ public class NokiaSettingsStorage {
 			setShortcutApps(result);
 			return result;
 		}
-		if (json.isEmpty()) {
+		return parseShortcutApps(json);
+	}
+
+	/**
+	 * 异步获取快捷栏应用列表（不阻塞主线程，供冷启动路径使用）。
+	 * - 已配置：同步解析 JSON（毫秒级，无 PackageManager 查询），直接回调；
+	 * - 首次未配置：在后台线程构建默认快捷应用（含 PackageManager 批量查询）并持久化，
+	 *   完成后回主线程回调。
+	 */
+	public void getShortcutAppsAsync(final OnShortcutAppsLoaded callback) {
+		if (callback == null) return;
+		final String json = prefs.getString(KEY_SHORTCUT_APPS, null);
+		if (json != null) {
+			// 已配置：同步解析（毫秒级，无 IPC），立即回调
+			callback.onLoaded(parseShortcutApps(json));
+			return;
+		}
+		// 首次启动：后台线程构建默认快捷应用（含 PackageManager 批量查询）
+		NokiaLog.i("SettingsStorage", "shortcut_apps 未配置，后台生成默认快捷应用");
+		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				long start = System.currentTimeMillis();
+				final List<ShortcutApp> defaults = buildDefaultShortcutApps();
+				long elapsed = System.currentTimeMillis() - start;
+				NokiaLog.i("SettingsStorage", "后台生成默认快捷应用完成: " + defaults.size()
+						+ " 个，耗时 " + elapsed + "ms");
+				setShortcutApps(defaults); // 持久化
+				mainHandler.post(new Runnable() {
+					@Override
+					public void run() {
+						callback.onLoaded(defaults);
+					}
+				});
+			}
+		}, "build-default-shortcuts").start();
+	}
+
+	/** 解析快捷栏 JSON；null/空返回空列表。 */
+	private List<ShortcutApp> parseShortcutApps(String json) {
+		List<ShortcutApp> result = new ArrayList<>();
+		if (json == null || json.isEmpty()) {
 			return result;
 		}
 		try {

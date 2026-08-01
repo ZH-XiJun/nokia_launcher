@@ -1,8 +1,12 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.AlarmClock;
 import android.provider.MediaStore;
 import android.provider.Settings;
@@ -91,9 +95,17 @@ public class NokiaS60IconMap {
 	};
 
 	// ── 缓存 ──
-	private static final Map<String, Integer> cache = new HashMap<>();
+	private static volatile Map<String, Integer> cache = new HashMap<>();
 	/** 上次扫描时的启动器包名集合，用于检测应用安装/卸载变化 */
 	private static Set<String> lastKnownPackages = null;
+
+	// ── 磁盘持久化（冷启动免全量重扫）──
+	private static final String PREFS_NAME = "nokia_s60_icon_cache";
+	private static final String KEY_CACHE = "icon_cache";
+	private static final String KEY_LAST_PKGS = "last_packages";
+	private static Context appContext;
+	/** 后台扫描进行中标记：防止多个调用方（桌面/功能表）重复启动扫描线程 */
+	private static volatile boolean scanStarted = false;
 
 	// ── 运行时兜底：关键词模糊匹配（包名包含任一关键词则命中）──
 	private static final Object[][] FUZZY_FALLBACK = {
@@ -143,8 +155,116 @@ public class NokiaS60IconMap {
 	}
 
 	/**
-	 * 初始化 / 刷新图标缓存。仅在应用列表发生变化时才重新扫描意图。
-	 * 应在 {@code loadApps()} 的前期调用一次。
+	 * 从磁盘读取上次持久化的图标缓存与包名集合（毫秒级，纯内存/SharedPreferences 操作）。
+	 * 冷启动时应先调用本方法，使 {@link #getIcon} 无需扫描即可返回上次结果。
+	 */
+	public static void loadFromDisk(Context context) {
+		appContext = context.getApplicationContext();
+		long start = System.currentTimeMillis();
+		try {
+			SharedPreferences sp = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+			String raw = sp.getString(KEY_CACHE, null);
+			if (raw != null && !raw.isEmpty()) {
+				Map<String, Integer> loaded = new HashMap<>();
+				String[] lines = raw.split("\n");
+				for (String line : lines) {
+					int eq = line.indexOf('=');
+					if (eq <= 0 || eq >= line.length() - 1) continue;
+					try {
+						loaded.put(line.substring(0, eq),
+								Integer.valueOf(line.substring(eq + 1)));
+					} catch (NumberFormatException ignore) {
+					}
+				}
+				if (!loaded.isEmpty()) {
+					cache = loaded;
+				}
+			}
+			Set<String> pkgs = sp.getStringSet(KEY_LAST_PKGS, null);
+			if (pkgs != null && !pkgs.isEmpty()) {
+				lastKnownPackages = new HashSet<>(pkgs);
+			}
+		} catch (Exception e) {
+			NokiaLog.w("S60IconMap", "loadFromDisk 失败: " + e.getMessage());
+		}
+		long elapsed = System.currentTimeMillis() - start;
+		NokiaLog.i("S60IconMap", "loadFromDisk 完成：cache=" + cache.size() + " 项, lastPkgs="
+				+ (lastKnownPackages != null ? lastKnownPackages.size() : 0) + ", 耗时 " + elapsed + "ms");
+	}
+
+	/**
+	 * 后台线程异步执行图标扫描（22 次 PackageManager 查询），完成后在主线程回调。
+	 * 包集合未变化时直接完成（不重扫）；变化时全量扫描并写回磁盘。
+	 * 应配合 {@link #loadFromDisk} 使用：冷启动先读盘秒出首帧，后台再异步刷新。
+	 *
+	 * @param onComplete 主线程回调，可为 null
+	 */
+	public static void initAsync(Context context, final Runnable onComplete) {
+		if (appContext == null) {
+			loadFromDisk(context);
+		}
+		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		synchronized (NokiaS60IconMap.class) {
+			if (scanStarted) {
+				// 扫描已在后台进行，不重复启动线程；回调直接派发（用当前内存缓存即可）
+				NokiaLog.d("S60IconMap", "initAsync: 扫描进行中，跳过重复启动");
+				if (onComplete != null) {
+					mainHandler.post(onComplete);
+				}
+				return;
+			}
+			scanStarted = true;
+		}
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				long start = System.currentTimeMillis();
+				try {
+					init(appContext.getPackageManager());
+				} catch (Exception e) {
+					NokiaLog.w("S60IconMap", "initAsync 扫描异常: " + e.getMessage());
+				} finally {
+					scanStarted = false;
+				}
+				long elapsed = System.currentTimeMillis() - start;
+				NokiaLog.i("S60IconMap", "initAsync 后台扫描结束，耗时 " + elapsed + "ms");
+				if (onComplete != null) {
+					mainHandler.post(onComplete);
+				}
+			}
+		}, "s60-icon-scan").start();
+	}
+
+	/**
+	 * 将当前缓存与包名集合写入 SharedPreferences（含 commit 写盘，应在后台线程调用）。
+	 */
+	private static void persistToDisk() {
+		if (appContext == null) {
+			return;
+		}
+		try {
+			SharedPreferences.Editor ed = appContext
+					.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit();
+			StringBuilder sb = new StringBuilder(cache.size() * 32);
+			for (Map.Entry<String, Integer> e : cache.entrySet()) {
+				if (sb.length() > 0) sb.append('\n');
+				sb.append(e.getKey()).append('=').append(e.getValue());
+			}
+			ed.putString(KEY_CACHE, sb.toString());
+			if (lastKnownPackages != null) {
+				ed.putStringSet(KEY_LAST_PKGS, new HashSet<>(lastKnownPackages));
+			}
+			ed.commit();
+			NokiaLog.i("S60IconMap", "persistToDisk: 已写入 " + cache.size() + " 项缓存");
+		} catch (Exception e) {
+			NokiaLog.w("S60IconMap", "persistToDisk 失败: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * 同步扫描 / 刷新图标缓存。仅在应用列表发生变化时才重新扫描意图。
+	 * 注意：本方法包含 PackageManager 批量查询，必须在后台线程调用（见 {@link #initAsync}）。
+	 * 扫描在局部 Map 上构建，完成后一次性原子替换，避免主线程读到半成品缓存。
 	 */
 	public static void init(PackageManager pm) {
 		// 获取当前所有启动器应用的包名集合
@@ -163,7 +283,7 @@ public class NokiaS60IconMap {
 		}
 
 		long start = System.currentTimeMillis();
-		cache.clear();
+		Map<String, Integer> newCache = new HashMap<>();
 
 		// 第 1 层：意图探测（优先级从高到低，先命中先得）
 		for (Probe probe : PROBES) {
@@ -171,8 +291,8 @@ public class NokiaS60IconMap {
 			for (ResolveInfo ri : hits) {
 				if (ri.activityInfo == null) continue;
 				String pkg = ri.activityInfo.packageName;
-				if (!cache.containsKey(pkg)) {
-					cache.put(pkg, probe.iconResId);
+				if (!newCache.containsKey(pkg)) {
+					newCache.put(pkg, probe.iconResId);
 				}
 			}
 		}
@@ -182,13 +302,15 @@ public class NokiaS60IconMap {
 			int resId = (int) row[0];
 			for (int i = 1; i < row.length; i++) {
 				String pkg = (String) row[i];
-				if (!cache.containsKey(pkg)) {
-					cache.put(pkg, resId);
+				if (!newCache.containsKey(pkg)) {
+					newCache.put(pkg, resId);
 				}
 			}
 		}
 
 		lastKnownPackages = currentPkgs;
+		cache = newCache; // 原子替换
+		persistToDisk();
 		long elapsed = System.currentTimeMillis() - start;
 		NokiaLog.i("S60IconMap", "init: 扫描完成，缓存 " + cache.size() + " 项，耗时 " + elapsed + "ms");
 	}

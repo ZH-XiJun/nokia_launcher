@@ -100,10 +100,8 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		focusIndex = -1;
 		selectedView = null;
 
-		// 加载快捷栏应用并动态创建视图
-		buildShortcutBar(view);
-		// 收集通知区焦点目标
-		collectNotifTargets(view);
+		// 加载快捷栏应用（已配置同步/首次异步，均不阻塞主线程），完成后重建快捷栏与焦点（含通知区）
+		loadShortcutBarAsync(view);
 
 		// 通知区点击行为：3g.qq.com → 浏览器打开网页；锁屏 → 一键锁屏
 		View notifRadio = view.findViewById(R.id.notifRadio);
@@ -116,15 +114,6 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		}
 		// 锁屏文案：显示「锁屏：按xxx键」，xxx 为桌面设置里绑定的锁屏键，方便用户记忆
 		refreshLockScreenHint(host);
-
-		// 初始选中第一个焦点（延迟到布局完成，确保气泡定位坐标准确）
-		view.post(() -> {
-			if (shortcutCount > 0) {
-				setFocusIndex(0);
-			} else if (focusTargets.size() > 0) {
-				setFocusIndex(0);
-			}
-		});
 
 		NokiaLog.i("Desktop", "桌面待机屏初始化完成：快捷栏 " + shortcutCount
 				+ " 项，通知区 " + NOTIF_COUNT + " 项，共 " + focusTargets.size() + " 个焦点");
@@ -142,21 +131,52 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 	// ---- 构建快捷栏 ----
 
-	private void buildShortcutBar(View view) {
+	/**
+	 * 冷启动快速渲染入口：先读磁盘图标缓存（毫秒级），再异步获取快捷栏配置并重建视图。
+	 * 首帧主线程路径不执行任何 PackageManager 查询。
+	 */
+	private void loadShortcutBarAsync(View view) {
+		// 冷启动：优先读磁盘缓存（毫秒级，无 PackageManager 查询），保证 getIcon 立即可用
+		long loadStart = System.currentTimeMillis();
+		NokiaS60IconMap.loadFromDisk(requireContext());
+		long loadElapsed = System.currentTimeMillis() - loadStart;
+		NokiaLog.i("Desktop", "S60 图标磁盘缓存加载耗时 " + loadElapsed + "ms");
+
+		// 已配置时同步回调（毫秒级）；首次未配置时后台构建默认快捷应用后回调（均回主线程）
+		settingsStorage.getShortcutAppsAsync(new NokiaSettingsStorage.OnShortcutAppsLoaded() {
+			@Override
+			public void onLoaded(List<ShortcutApp> apps) {
+				if (!isAdded() || getView() == null) return;
+				NokiaLog.i("Desktop", "快捷栏配置就绪：" + apps.size() + " 项，开始重建快捷栏");
+				rebuildShortcutBar(apps);
+			}
+		});
+	}
+
+	/**
+	 * 重建快捷栏视图与焦点目标（快捷项在前、通知区在后），并异步刷新 S60 图标。
+	 * 主线程路径无 PackageManager 查询。
+	 */
+	private void rebuildShortcutBar(List<ShortcutApp> apps) {
+		View view = getView();
+		if (view == null) return;
 		LinearLayout container = view.findViewById(R.id.shortcutContainer);
 		if (container == null) {
 			NokiaLog.w("Desktop", "shortcutContainer 未找到");
 			return;
 		}
+
+		long buildStart = System.currentTimeMillis();
 		container.removeAllViews();
 
-		// 初始化 S60 图标缓存，确保快捷栏图标与功能表一致
-		NokiaS60IconMap.init(requireActivity().getPackageManager());
-
-		List<ShortcutApp> apps = settingsStorage.getShortcutApps();
 		shortcutApps.clear();
 		shortcutApps.addAll(apps);
 		shortcutCount = apps.size();
+		focusIndex = -1;
+		selectedView = null;
+
+		// 焦点目标整体重建：快捷项在前，通知区在后
+		focusTargets.clear();
 
 		if (apps.isEmpty()) {
 			// 空状态：显示提示文字
@@ -169,18 +189,37 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			hint.setTextSize(10);
 			container.addView(hint);
 			NokiaLog.i("Desktop", "快捷栏为空");
-			return;
-		}
-
-		for (int i = 0; i < apps.size(); i++) {
-			ShortcutApp app = apps.get(i);
-			LinearLayout cell = createShortcutCell(app, i);
-			if (cell != null) {
-				container.addView(cell);
-				focusTargets.add(cell);
+		} else {
+			for (int i = 0; i < apps.size(); i++) {
+				ShortcutApp app = apps.get(i);
+				LinearLayout cell = createShortcutCell(app, i);
+				if (cell != null) {
+					container.addView(cell);
+					focusTargets.add(cell);
+				}
 			}
 		}
-		NokiaLog.i("Desktop", "快捷栏已构建：" + apps.size() + " 项");
+
+		// 收集通知区焦点目标（排在快捷项之后，保证导航顺序：快捷栏 → 通知区）
+		collectNotifTargets(view);
+
+		long buildElapsed = System.currentTimeMillis() - buildStart;
+		NokiaLog.i("Desktop", "快捷栏已构建：" + apps.size() + " 项，共 " + focusTargets.size()
+				+ " 个焦点，耗时 " + buildElapsed + "ms");
+
+		// 初始选中第一个焦点（延迟到布局完成，确保气泡定位坐标准确）
+		view.post(() -> {
+			if (focusTargets.size() > 0) {
+				setFocusIndex(0);
+			}
+		});
+
+		// 后台异步扫描 S60 图标缓存（包集合未变不重扫），完成后仅刷新图标，不重建视图/焦点
+		NokiaS60IconMap.initAsync(requireContext(), () -> {
+			if (!isAdded() || getView() == null) return;
+			NokiaLog.i("Desktop", "S60 图标缓存就绪，刷新快捷栏图标");
+			refreshShortcutIcons(container);
+		});
 	}
 
 	private LinearLayout createShortcutCell(ShortcutApp app, int index) {
@@ -196,7 +235,8 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 		ImageView iv = new ImageView(ctx);
 		iv.setLayoutParams(new LinearLayout.LayoutParams(dp(22), dp(22)));
-		Drawable icon = loadShortcutIcon(app);
+		// 首帧仅加载内存图标（S60 缓存 / 关键词匹配，无 IPC）；真实图标由后台异步刷新
+		Drawable icon = loadShortcutIconMemory(app);
 		if (icon != null) {
 			iv.setImageDrawable(icon);
 		} else {
@@ -210,7 +250,42 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		return cell;
 	}
 
-	private Drawable loadShortcutIcon(ShortcutApp app) {
+	/**
+	 * 主线程轻量图标加载（首帧使用）：仅读内存 S60 图标缓存，无 PackageManager 查询、
+	 * 无文件 IO。未命中返回 null（调用方用占位图标，后台异步刷新真实图标）。
+	 */
+	private Drawable loadShortcutIconMemory(ShortcutApp app) {
+		try {
+			if (app.type == ShortcutApp.TYPE_ANDROID) {
+				Intent intent = app.getLaunchIntent();
+				if (intent != null && intent.getComponent() != null) {
+					String pkg = intent.getComponent().getPackageName();
+					// 优先使用 S60 风格图标，与功能表保持一致（读内存缓存，毫秒级）
+					int s60Res = NokiaS60IconMap.getIcon(pkg);
+					if (s60Res != 0) {
+						try {
+							Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
+							if (s60Icon != null) {
+								NokiaLog.d("Desktop", "快捷栏应用 " + app.label + " 使用 S60 图标(内存)");
+								return s60Icon;
+							}
+						} catch (Exception e) {
+							NokiaLog.w("Desktop", "加载 S60 图标失败: " + app.label);
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			NokiaLog.w("Desktop", "加载快捷栏图标(内存)失败: " + app.label);
+		}
+		return null;
+	}
+
+	/**
+	 * 完整图标加载（可在后台线程执行）：J2ME 文件图标 → S60 图标 → 应用真实图标。
+	 * 含文件 IO 与 getActivityIcon IPC，冷启动首帧禁止在主线程调用。
+	 */
+	private Drawable loadShortcutIconNow(ShortcutApp app) {
 		try {
 			if (app.type == ShortcutApp.TYPE_J2ME && app.iconPath != null) {
 				// J2ME 图标从本地文件加载
@@ -236,7 +311,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 						}
 					}
 
-					// 兜底：使用应用真实图标
+					// 兜底：使用应用真实图标（getActivityIcon 为 IPC，后台线程调用）
 					try {
 						return requireActivity().getPackageManager()
 								.getActivityIcon(intent.getComponent());
@@ -249,6 +324,39 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			NokiaLog.w("Desktop", "加载快捷栏图标失败: " + app.label);
 		}
 		return null;
+	}
+
+	/**
+	 * 后台异步刷新快捷栏各单元的图标（S60 扫描 / 首次默认构建完成后调用）。
+	 * 图标加载在后台线程执行，回主线程逐项 setImageDrawable；不重建 View，不影响焦点索引。
+	 */
+	private void refreshShortcutIcons(final LinearLayout container) {
+		if (container == null || shortcutApps.isEmpty()) return;
+		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		for (int i = 0; i < shortcutApps.size(); i++) {
+			final ShortcutApp app = shortcutApps.get(i);
+			final int index = i;
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					final Drawable icon = loadShortcutIconNow(app);
+					mainHandler.post(new Runnable() {
+						@Override
+						public void run() {
+							if (!isAdded() || getView() == null) return;
+							if (index >= container.getChildCount()) return;
+							View child = container.getChildAt(index);
+							if (!(child instanceof LinearLayout)) return;
+							View iconView = ((LinearLayout) child).getChildAt(0);
+							if (iconView instanceof ImageView && icon != null) {
+								((ImageView) iconView).setImageDrawable(icon);
+							}
+						}
+					});
+				}
+			}, "shortcut-icon-" + index).start();
+		}
+		NokiaLog.i("Desktop", "后台刷新快捷栏图标完成（" + shortcutApps.size() + " 项）");
 	}
 
 	private void launchShortcutApp(ShortcutApp app) {

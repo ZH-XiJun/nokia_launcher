@@ -24,6 +24,8 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.multidex.MultiDex;
@@ -58,29 +60,76 @@ public class EmulatorApplication extends Application {
 	@SuppressWarnings("ConstantConditions")
 	@Override
 	protected void attachBaseContext(Context base) {
+		long appStart = System.currentTimeMillis();
 		super.attachBaseContext(base);
 		if (BuildConfig.DEBUG) {
 			MultiDex.install(this);
 		}
 		ContextHolder.setApplication(this);
-		ACRA.init(this, new CoreConfigurationBuilder()
-				.withBuildConfigClass(BuildConfig.class)
-				.withParallel(false)
-				.withSendReportsInDevMode(false)
-				.withPluginConfigurations(new DialogConfigurationBuilder()
-						.withTitle(getString(R.string.crash_dialog_title))
-						.withText(getString(R.string.crash_dialog_message))
-						.withPositiveButtonText(getString(R.string.report_crash))
-						.withResTheme(androidx.appcompat.R.style.Theme_AppCompat_DayNight_Dialog)
-						.withEnabled(true)
-						.build()
-				));
-		boolean enabled = isSignatureValid() && !BuildConfig.FLAVOR.equals("dev");
-		ACRA.getErrorReporter().setEnabled(enabled);
+
+		// 主题与向量图设置必须早期同步完成（毫秒级，直接决定首帧主题），不能延迟
 		SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
 		sp.registerOnSharedPreferenceChangeListener(themeListener);
 		setNightMode(sp.getString(Constants.PREF_THEME, null));
 		AppCompatDelegate.setCompatVectorFromResourcesEnabled(true);
+
+		// ACRA 崩溃上报初始化（含签名校验 IPC）延迟到主线程约 2s 后执行，
+		// 避免冷启动进程阶段阻塞首帧；仅主进程延迟，:midlet 子进程保持同步初始化（游戏崩溃上报不受影响）。
+		if (isMainProcess()) {
+			new Handler(Looper.getMainLooper()).postDelayed(this::initAcra, 2000);
+		} else {
+			initAcra();
+		}
+		long elapsed = System.currentTimeMillis() - appStart;
+		android.util.Log.i("EmulatorApp", "attachBaseContext 完成，耗时 " + elapsed + "ms");
+	}
+
+	/** ACRA 崩溃上报初始化（签名校验等 IPC 较慢，从首帧路径移出）。 */
+	private void initAcra() {
+		long start = System.currentTimeMillis();
+		try {
+			ACRA.init(this, new CoreConfigurationBuilder()
+					.withBuildConfigClass(BuildConfig.class)
+					.withParallel(false)
+					.withSendReportsInDevMode(false)
+					.withPluginConfigurations(new DialogConfigurationBuilder()
+							.withTitle(getString(R.string.crash_dialog_title))
+							.withText(getString(R.string.crash_dialog_message))
+							.withPositiveButtonText(getString(R.string.report_crash))
+							.withResTheme(androidx.appcompat.R.style.Theme_AppCompat_DayNight_Dialog)
+							.withEnabled(true)
+							.build()
+					));
+			boolean enabled = isSignatureValid() && !BuildConfig.FLAVOR.equals("dev");
+			ACRA.getErrorReporter().setEnabled(enabled);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		long elapsed = System.currentTimeMillis() - start;
+		android.util.Log.i("EmulatorApp", "ACRA 初始化完成，耗时 " + elapsed + "ms");
+	}
+
+	/** 读取 /proc/self/cmdline 判断当前是否为主进程（轻量文件读取，无 Binder IPC）。 */
+	private boolean isMainProcess() {
+		try {
+			java.io.BufferedReader br = new java.io.BufferedReader(
+					new java.io.FileReader("/proc/self/cmdline"));
+			try {
+				String cmdline = br.readLine();
+				if (cmdline != null) {
+					int end = cmdline.indexOf('\0');
+					if (end > 0) {
+						cmdline = cmdline.substring(0, end);
+					}
+					// 子进程（如 :midlet）cmdline 为 "<包名>:<进程名>"，主进程为 "<包名>"
+					return !cmdline.contains(getPackageName() + ":");
+				}
+			} finally {
+				br.close();
+			}
+		} catch (Exception ignore) {
+		}
+		return true;
 	}
 
 	@SuppressLint("PackageManagerGetSignatures")

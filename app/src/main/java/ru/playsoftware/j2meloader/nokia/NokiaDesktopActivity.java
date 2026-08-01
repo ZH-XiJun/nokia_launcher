@@ -28,6 +28,8 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	private static final String CATEGORY_HOME = Intent.CATEGORY_HOME;
 	private StatusBarController statusBarController;
 	private NokiaKeyBinding keyBinding;
+	/** Activity 是否处于 resumed 状态（延迟任务防重入校验用） */
+	private boolean resumedFlag = false;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -97,6 +99,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	@Override
 	protected void onResume() {
 		super.onResume();
+		resumedFlag = true;
 		// 桌面始终竖屏：从横屏游戏返回时必须强制旋转回竖屏，
 		// 否则系统会沿用游戏的横屏方向导致桌面横向显示。
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
@@ -104,9 +107,35 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		if (keyBinding != null) {
 			keyBinding.reload();
 		}
-		if (statusBarController != null) {
-			statusBarController.start();
+		// 状态栏系统信息（信号/运营商/WiFi/电池等）查询延迟到首帧渲染后执行，
+		// 避免冷启动时同步 Binder 调用阻塞首帧；延迟回调前若已 pause 则跳过（防重复注册）。
+		scheduleStatusBarStart();
+		NokiaLog.i("Desktop", "onResume 已调度 StatusBarController 延迟启动");
+	}
+
+	/** 延迟启动状态栏控制器（首帧后约 200ms），带 onPause 防重入校验与计时日志。 */
+	private void scheduleStatusBarStart() {
+		if (statusBarController == null) {
+			return;
 		}
+		final Runnable task = new Runnable() {
+			@Override
+			public void run() {
+				if (!resumedFlag) {
+					NokiaLog.d("Desktop", "状态栏延迟启动取消：Activity 已非 resumed");
+					return;
+				}
+				long start = System.currentTimeMillis();
+				try {
+					statusBarController.start();
+				} catch (Exception e) {
+					NokiaLog.w("Desktop", "状态栏延迟启动异常: " + e.getMessage());
+				}
+				long elapsed = System.currentTimeMillis() - start;
+				NokiaLog.i("Desktop", "StatusBarController.start 完成，耗时 " + elapsed + "ms");
+			}
+		};
+		getWindow().getDecorView().postDelayed(task, 200);
 	}
 
 
@@ -125,6 +154,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 
 	@Override
 	protected void onPause() {
+		resumedFlag = false;
 		super.onPause();
 		if (statusBarController != null) {
 			statusBarController.stop();

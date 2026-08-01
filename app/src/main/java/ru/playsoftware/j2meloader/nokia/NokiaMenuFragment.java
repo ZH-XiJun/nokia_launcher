@@ -115,6 +115,9 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 	private NokiaAppItem[] pageItems;
 	private View selectedView = null;
 
+	/** 防止 S60 图标异步扫描完成后重复刷新当前页图标 */
+	private boolean iconRefreshDone = false;
+
 	/** 滑动翻页阈值（px，由 dp 换算）与最小速度（px/ms） */
 	private float swipeThreshold;
 	private float swipeMinVel;
@@ -189,8 +192,9 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		PackageManager pm = host.getPackageManager();
 
-		// 初始化 S60 图标缓存（仅在应用变化时重新扫描意图）
-		NokiaS60IconMap.init(pm);
+		// S60 图标缓存：冷启动时桌面已通过 initAsync 异步扫描并持久化；
+		// 此处仅读磁盘缓存（毫秒级，无 PackageManager 批量查询），不阻塞功能表打开
+		NokiaS60IconMap.loadFromDisk(requireContext());
 
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -300,6 +304,46 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 
 		NokiaLog.i("Menu", "最终列表（固定槽位 " + pinned.size() + " + 特殊入口 + 匹配 " + matchedPool.size() + " + 未匹配 " + unmatchedPool.size() + "）共 " + items.size() + " 项");
 		totalPages = Math.max(1, (int) Math.ceil((double) items.size() / perPage));
+
+		// S60 图标缓存：冷启动时桌面已后台扫描（scanStarted 防重复）；此处仅确保扫描已发起，
+		// 完成后在主线程刷新当前页应用图标（不重建网格，不影响焦点/分页）
+		NokiaS60IconMap.initAsync(requireContext(), new Runnable() {
+			@Override
+			public void run() {
+				refreshAfterIconInit();
+			}
+		});
+	}
+
+	/**
+	 * S60 图标异步扫描完成后：用最新缓存刷新当前页各应用的图标（仅替换 ImageView，不重建网格）。
+	 */
+	private void refreshAfterIconInit() {
+		if (iconRefreshDone || !isAdded() || getView() == null) return;
+		iconRefreshDone = true;
+		long start = System.currentTimeMillis();
+		for (int i = 0; i < perPage; i++) {
+			NokiaAppItem item = pageItems[i];
+			View cell = cellViews[i];
+			if (item == null || cell == null) continue;
+			if (item.type != NokiaAppItem.TYPE_APP) continue;
+			if (item.launchIntent == null || item.launchIntent.getComponent() == null) continue;
+			String pkg = item.launchIntent.getComponent().getPackageName();
+			int resId = NokiaS60IconMap.getIcon(pkg);
+			if (resId == 0) continue;
+			Drawable s60Icon = safeDrawable((NokiaDesktopActivity) requireActivity(), resId);
+			if (s60Icon == null) continue;
+			s60Icon.setFilterBitmap(false);
+			item.icon = s60Icon;
+			if (cell instanceof LinearLayout) {
+				View iv = ((LinearLayout) cell).getChildAt(0);
+				if (iv instanceof ImageView) {
+					((ImageView) iv).setImageDrawable(s60Icon);
+				}
+			}
+		}
+		long elapsed = System.currentTimeMillis() - start;
+		NokiaLog.i("Menu", "S60 图标缓存更新后刷新当前页图标，耗时 " + elapsed + "ms");
 	}
 
 	/** 在应用池中按包名查找第一个命中的项并移除，返回之；未命中返回 null。 */
