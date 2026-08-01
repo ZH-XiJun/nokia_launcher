@@ -77,18 +77,8 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 			if (panel == null || panel.getHeight() <= 0 || view.getHeight() <= 0) {
 				return;
 			}
-			DisplayMetrics dm = getResources().getDisplayMetrics();
-			float density = dm.density;
-			float widthDp = dm.widthPixels / density;
-			float heightDp = dm.heightPixels / density;
-			// 与 NokiaBaseActivity.scaleMidContent 完全相同的缩放算法
-			float scale = widthDp / 240f;
-			if (320f * scale > heightDp) {
-				scale = heightDp / 320f;
-			}
-			if (Math.abs(scale - Math.round(scale)) < 0.04f) {
-				scale = Math.round(scale);
-			}
+			// 统一使用 getScale() 获取缩放比（与基类算法一致）
+			float scale = host.getScale();
 			int panelH = panel.getHeight();
 			int targetH = Math.round(panelH / scale);
 			ViewGroup.LayoutParams lp = view.getLayoutParams();

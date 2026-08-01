@@ -72,6 +72,12 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		return keyBinding;
 	}
 
+	/** 返回 midPanel 的当前真实像素高度（可能为 0 若尚未布局完成）。用于行数空间预算的实测反推。 */
+	public int getMidPanelHeight() {
+		View mid = findViewById(R.id.midPanel);
+		return mid != null ? mid.getHeight() : 0;
+	}
+
 	/**
 	 * 重新读取当前页面的 {@link NokiaPage} 声明并装配底部菜单栏。
 	 * <p>

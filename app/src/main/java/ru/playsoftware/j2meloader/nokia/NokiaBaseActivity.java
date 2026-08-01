@@ -100,6 +100,26 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	private static final float BOT_H = 22f;
 	private static final float MID_H = 262f; // 320(设计总高) - 36(顶栏) - 22(底栏)
 
+	/** 缓存的当前缩放比，在 applyScale() 中计算并存储，通过 getScale() 对外暴露。 */
+	private float mCachedScale = 1f;
+
+	/** 返回当前屏幕的缩放比 = max(屏宽dp/240, 屏高dp/320) 并吸附整数（<0.04）。Fragment 计算行数空间预算时必须使用此值。 */
+	public float getScale() {
+		return mCachedScale;
+	}
+
+	/** 计算缩放比：宽度优先，高度溢出时退化为 contain，接近整数时吸附。 */
+	private static float computeScale(float widthDp, float heightDp) {
+		float scale = widthDp / BASE_W;
+		if (BASE_W > 0 && 320f * scale > heightDp) {
+			scale = heightDp / 320f;
+		}
+		if (Math.abs(scale - Math.round(scale)) < 0.04f) {
+			scale = Math.round(scale);
+		}
+		return scale;
+	}
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -132,16 +152,8 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		float heightDp = dm.heightPixels / density;
 
 		// 宽度优先缩放；若整体高度会超出屏幕则退化为 contain，避免裁切。
-		float scale = widthDp / BASE_W;
-		if (BASE_W > 0 && 320f * scale > heightDp) {
-			scale = heightDp / 320f;
-		}
-		// 把接近整数的缩放比吸附到整数，避免 setScaleX/Y 亚像素插值导致的整体模糊。
-		// 例如 mdpi(scale=1)、高 DPI(scale=2) 等整数倍保持清晰；仅当与最近整数相差
-		// < 0.04 才吸附，避免明显改变布局。
-		if (Math.abs(scale - Math.round(scale)) < 0.04f) {
-			scale = Math.round(scale);
-		}
+		float scale = computeScale(widthDp, heightDp);
+		mCachedScale = scale;
 		Log.i("NokiaScale", "applyScale densityDpi=" + dm.densityDpi
 				+ " density=" + density + " screenPx=" + dm.widthPixels + "x" + dm.heightPixels
 				+ " widthDp=" + widthDp + " heightDp=" + heightDp + " scale=" + scale);
@@ -235,13 +247,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		float density = dm.density;
 		float widthDp = dm.widthPixels / density;
 		float heightDp = dm.heightPixels / density;
-		float scale = widthDp / BASE_W;
-		if (BASE_W > 0 && 320f * scale > heightDp) {
-			scale = heightDp / 320f;
-		}
-		if (Math.abs(scale - Math.round(scale)) < 0.04f) {
-			scale = Math.round(scale);
-		}
+		float scale = computeScale(widthDp, heightDp);
 		Log.i("NokiaScale", "scaleMidContent density=" + density
 				+ " widthDp=" + widthDp + " heightDp=" + heightDp + " scale=" + scale);
 

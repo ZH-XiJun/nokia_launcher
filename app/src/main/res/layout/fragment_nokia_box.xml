@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 应用程序中间内容（碎片）：240dp 宽 × 262dp 高，由基类缩放。
-     262dp = 320 - 36 - 22，正好填满中间容器不被裁切。
-     ScrollView 内为 LinearLayout 容器，由 Java 代码动态添加网格/次级菜单。 -->
+<!-- 应用程序中间内容（碎片）：ScrollView 弹性填充中间容器。
+     根视图高度 match_parent，由 scaleMidContent 缩放；内部为 LinearLayout 容器，
+     由 Java 代码动态添加网格行。 -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/appScroll"
-    android:layout_width="240dp"
-    android:layout_height="262dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
     android:scrollbars="none"
     android:fadingEdge="none"
     android:overScrollMode="never">

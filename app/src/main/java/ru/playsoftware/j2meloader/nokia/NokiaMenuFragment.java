@@ -91,12 +91,10 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 
 	/** 列数固定 3 列（诺基亚经典风格） */
 	private static final int COLS = 3;
-	/** 每格设计高度（dp），图标 36 + 标签 9 + 间距；240x320 上取 58 使 4 行完整且留余量不裁切 */
+	/** 行高由实际可用空间均分，此常量仅作为 fallback（panelH 尚未可用时）。图标 36 + 标签 9 + 间距 */
 	private static final int ROW_H_DP = 58;
 	/** 标题预留高度（dp，含功能表标题与网格上下内边距，留少量余量防裁切） */
 	private static final int TITLE_H_DP = 22;
-	/** 顶/底栏占用的设计高度（dp）= 36(顶) + 22(底)，用于估算可用网格高度 */
-	private static final int BAR_H_DP = 58;
 
 	private final ArrayList<NokiaAppItem> items = new ArrayList<>();
 	private LinearLayout appGrid;
@@ -147,41 +145,50 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 		appGrid = view.findViewById(R.id.appGrid);
 		tvPage = view.findViewById(R.id.menuPage);
 
-		computeRowsPerPage();
-		// 按 perPage 分配页内缓存数组
-		cellViews = new View[perPage];
-		pageItems = new NokiaAppItem[perPage];
-
 		// 先初始化滑动监听（在 buildCurrentPage 之前，使每个 cell 都能挂载）
 		initSwipeListener(view);
 
-		loadApps();
-		buildCurrentPage();
-		setFocusPos(0);
+		// 延迟到 midPanel 布局完成后再计算行数并构建网格（panelH 需要实测反推）
+		view.post(() -> {
+			if (!isAdded()) return;
+			computeRowsPerPage();
+			// 按 perPage 分配页内缓存数组
+			cellViews = new View[perPage];
+			pageItems = new NokiaAppItem[perPage];
+			loadApps();
+			buildCurrentPage();
+			setFocusPos(0);
 
-		NokiaLog.i("Menu", "功能表初始化完成：共 " + items.size() + " 项，"
-				+ totalPages + " 页，每页 " + perPage + " 格（" + COLS + "×" + rowsPerPage + "）");
+			NokiaLog.i("Menu", "功能表初始化完成（延迟到 panelH 可用）：共 " + items.size() + " 项，"
+					+ totalPages + " 页，每页 " + perPage + " 格（" + COLS + "×" + rowsPerPage + "）");
+		});
 	}
 
 	// ---- 分辨率自适应：计算每页行数 ----
 
+	/**
+	 * 用实测 midPanel 像素高度反推行数空间预算，不再使用估算公式。
+	 * 公式：availDesign = panelH(px) / density / scale；rows = (availDesign - TITLE_H_DP) / ROW_H_DP
+	 * 行高在 buildCurrentPage() 中按 availDesign 均分拉伸。
+	 */
 	private void computeRowsPerPage() {
-		android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
-		float density = dm.density;
-		float widthDp = dm.widthPixels / density;
-		float heightDp = dm.heightPixels / density;
-		float scale = widthDp / 240f;
-		if (320f * scale > heightDp) {
-			scale = heightDp / 320f;
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		int panelH = host.getMidPanelHeight();
+		if (panelH <= 0) {
+			// panelH 尚未布局完成，保持默认值，稍后由 post 回调重新计算
+			NokiaLog.w("Menu", "computeRowsPerPage: panelH 尚未可用，保持默认 rowsPerPage=" + rowsPerPage);
+			return;
 		}
-		// 可用网格设计高度 = (屏幕高 - 顶/底栏) / 缩放比
-		float availDesign = (heightDp - BAR_H_DP) / scale;
+		float density = getResources().getDisplayMetrics().density;
+		float scale = host.getScale();
+		// 实测反推：可用设计高度 = panelH(px) / density / scale
+		float availDesign = panelH / density / scale;
 		int rows = (int) ((availDesign - TITLE_H_DP) / ROW_H_DP);
 		rows = Math.max(3, Math.min(8, rows));
 		rowsPerPage = rows;
 		perPage = COLS * rowsPerPage;
 		NokiaLog.i("Menu", "computeRowsPerPage: rowsPerPage=" + rowsPerPage
-				+ " scale=" + scale + " widthDp=" + widthDp + " heightDp=" + heightDp
+				+ " panelH=" + panelH + " scale=" + scale + " density=" + density
 				+ " availDesign=" + availDesign);
 	}
 
@@ -380,16 +387,26 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 			pageItems[i] = null;
 		}
 
+		// 行高均分拉伸：按实测可用空间计算每行实际 dp 高度，而非写死 58dp
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		int panelH = host.getMidPanelHeight();
+		float density = getResources().getDisplayMetrics().density;
+		float scale = host.getScale();
+		float availDesign = panelH > 0 ? (panelH / density / scale) : 262f;
+		float rowActualDp = rowsPerPage > 0 ? (availDesign - TITLE_H_DP) / rowsPerPage : ROW_H_DP;
+		int rowH = NokiaDimens.dp(getResources(), Math.round(rowActualDp));
+
 		int start = pageIndex * perPage;
 		int count = Math.min(perPage, items.size() - start);
 		NokiaLog.d("Menu", "buildCurrentPage 页=" + (pageIndex + 1) + "/" + totalPages
-				+ " start=" + start + " count=" + count + " rows=" + rowsPerPage);
+				+ " start=" + start + " count=" + count + " rows=" + rowsPerPage
+				+ " rowH=" + rowH + "px rowActualDp=" + rowActualDp + " availDesign=" + availDesign);
 
 		for (int r = 0; r < rowsPerPage; r++) {
 			LinearLayout row = new LinearLayout(requireContext());
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), ROW_H_DP)));
+					LinearLayout.LayoutParams.MATCH_PARENT, rowH));
 
 			for (int c = 0; c < COLS; c++) {
 				int pos = r * COLS + c;

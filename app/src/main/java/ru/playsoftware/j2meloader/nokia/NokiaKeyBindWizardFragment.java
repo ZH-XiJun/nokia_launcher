@@ -60,6 +60,28 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaPage, N
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.scaleMidContent(view, true);
 
+		// 动态调整根视图高度 = panelH / scale，使内容视觉高度恰好填满中间容器，
+		// 避免 contentFillsPanel=true 时跳过二次缩小导致内容偏下（320×480 设备尤其明显）。
+		// 与 NokiaKeyBindFragment 逻辑一致，scale 走 getScale() 单一来源。
+		view.post(() -> {
+			View panel = (View) view.getParent();
+			if (panel == null || panel.getHeight() <= 0 || view.getHeight() <= 0) {
+				return;
+			}
+			float scale = host.getScale();
+			int panelH = panel.getHeight();
+			int targetH = Math.round(panelH / scale);
+			ViewGroup.LayoutParams lp = view.getLayoutParams();
+			if (lp.height != targetH) {
+				lp.height = targetH;
+				view.setLayoutParams(lp);
+				NokiaLog.i("KeyWizard", "调整内容高度=" + targetH + "px 使视觉高=panelH=" + panelH
+						+ "px scale=" + scale);
+				// 高度变化后重新执行等比缩放（此时 visualH == panelH，不触发缩小分支）
+				view.post(() -> host.scaleMidContent(view, true));
+			}
+		});
+
 		keyBinding = new NokiaKeyBinding(requireContext());
 
 		// 壁纸设为桌面深蓝渐变，与诺基亚桌面画风一致

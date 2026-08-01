@@ -243,6 +243,60 @@ view.setBackground(new NokiaDashedLineDrawable(0x60FFFFFF, 3, 3)); // 旧构造�
 - **中间通知区/桌面组件区**为弹性区（`layout_height="match_parent"` + `layout_below` 下点线），允许被挤压（后续会做可滚动）
 - 新页面设计时遵循同样原则：标题/工具栏固定 + 内容区弹性
 
+### 行数空间预算（重要）
+
+**所有网格类页面（功能表、百宝箱等）的行数计算必须基于实测 panelH 反推，禁止使用估算公式。行高必须均分拉伸，禁止写死固定 dp。**
+
+背景与原因：
+
+1. 早期 `NokiaMenuFragment` 和 `NokiaBoxFragment` 使用 `(heightDp - BAR_H_DP) / scale` 估算可用空间，但 `BAR_H_DP` 是假设值（顶栏 36dp + 底栏 22dp = 58dp），**实际顶栏因 wrap_content + 系统状态栏高度差异而偏高**（如 240×320 设备实测 panelH=253 而非 262），导致高估可用空间 → 行数算多 → 最后一行被底栏裁切。
+2. 早期行高写死固定值（菜单 58dp、百宝箱 64dp），320×480 设备实测 panelH=408 但公式低估 → 4 行仅占 232dp → 底部留白 69px，浪费空间。
+3. `scale` 来源不统一：`NokiaBaseActivity.scaleMidContent()` 和各 Fragment 的 `computeRowsPerPage()` 各自独立计算 scale，容易因 density 修正后的微小差异导致空间预算与缩放不同步。
+
+正确做法：
+
+- **scale 单一来源**：Fragment 一律通过 `((NokiaDesktopActivity) requireActivity()).getScale()` 获取缩放比，不再自行计算。
+- **panelH 实测反推**：通过 `((NokiaDesktopActivity) requireActivity()).getMidPanelHeight()` 获取 midPanel 真实像素高度，公式为 `availDesign = panelH(px) / density / scale`，再计算 `rows = (availDesign - TITLE_H_DP) / ROW_H_DP`。
+- **行高均分拉伸**：行数确定后，每行实际 dp = `(availDesign - TITLE_H_DP) / rows`，避免底部留白或裁切。`ROW_H_DP` 降级为 fallback 值。
+- **时序**：`computeRowsPerPage()` 和 `buildGrid()/buildCurrentPage()` 必须延迟到 midPanel 布局完成后执行（`view.post(() -> { ... })`），确保 panelH > 0。
+- **禁止**：自行计算 scale；写死 `BAR_H_DP` 等假设值；行高写死固定 dp；在 panelH=0 时提前建页。
+
+### match_parent 根布局的二次缩放陷阱（重要）
+
+**使用 `match_parent` 根布局 + `scaleMidContent(view, true)`（topAlign）的 Fragment，必须补充 `view.post` 动态高度调整逻辑，否则 scale > 1 时内容视觉偏下。**
+
+背景与原因：
+
+1. 根布局 `match_parent` → 内容高度 = panelH。`scaleMidContent` 判定 `contentFillsPanel=true` 跳过二次缩小。
+2. 但 `topAlign=true` + `setPivotY(0)` + `content.setScaleX/Y(scale)`，视觉高度 = panelH × scale。
+3. scale > 1 时（如 320×480 设备 scale≈1.33），visualH > panelH，缩放后视觉位置从顶部偏移，内容整体偏下。
+4. 240×320 设备 scale=1 不受影响，因此此 bug 只在较高分辨率设备上暴露。
+
+正确做法（`NokiaKeyBindFragment` / `NokiaKeyBindWizardFragment` 已有正确实现）：
+
+```java
+// 在 onViewCreated 中 scaleMidContent 之后
+host.scaleMidContent(view, true);
+
+view.post(() -> {
+    View panel = (View) view.getParent();
+    if (panel == null || panel.getHeight() <= 0 || view.getHeight() <= 0) return;
+    float scale = host.getScale();
+    int panelH = panel.getHeight();
+    int targetH = Math.round(panelH / scale);  // 使缩放后视觉高恰好 = panelH
+    ViewGroup.LayoutParams lp = view.getLayoutParams();
+    if (lp.height != targetH) {
+        lp.height = targetH;
+        view.setLayoutParams(lp);
+        // 高度变化后重新缩放：此时 visualH == panelH，不触发缩小分支
+        view.post(() -> host.scaleMidContent(view, true));
+    }
+});
+```
+
+- **禁止**：`match_parent` + `topAlign=true` 的 Fragment 不加此调整；自行计算 scale（走 `getScale()` 单一来源）。
+- 已修复的案例：`NokiaKeyBindFragment`（已有）、`NokiaKeyBindWizardFragment`（补上后修复 320×480 偏下）。
+
 ### 新界面 Checklist
 
 新增或修改任何 nokia 界面时，逐项自查：
@@ -252,8 +306,12 @@ view.setBackground(new NokiaDashedLineDrawable(0x60FFFFFF, 3, 3)); // 旧构造�
 - [ ] Fragment 根布局高度为 `match_parent`（非 262dp）
 - [ ] 弹窗关键尺寸引用 `dimens.xml`（非硬编码 28dp/14sp/12sp）
 - [ ] 点线分隔线用 `NokiaDashedLineDrawable(getResources(), ...)`（非 XML shape dash）
+- [ ] 网格页面行数走实测 panelH 反推（`getMidPanelHeight()`），非估算公式
+- [ ] 网格行高均分拉伸，非写死固定 dp
+- [ ] scale 走 `getScale()` 单一来源，不自算
+- [ ] `match_parent` 根布局 + `topAlign=true` 的 Fragment 需补 `view.post` 动态高度调整
 - [ ] 在 **240×320（4a24ecf）** 和 **320×480（tcpip）** 两台真机上截图验证
-- [ ] 验证重点：点线清晰、无右侧缝隙、列表最后一项不被底栏遮挡、弹窗比例合适
+- [ ] 验证重点：点线清晰、无右侧缝隙、列表最后一项不被底栏遮挡、弹窗比例合适、网格行不裁切也不留白
 
 
 
