@@ -1,0 +1,678 @@
+package ru.playsoftware.j2meloader.nokia;
+
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import ru.playsoftware.j2meloader.R;
+
+/**
+ * 桌面组件设置主界面。承载设计文档中的全部状态：
+ * S1 正常浏览 / S2 左软键弹出选项菜单 / S3 删除模式 / S4 排序光标态 / S5 排序拎起态。
+ * S6（类型选择）由 {@link NokiaWidgetTypePickerFragment} 实现。
+ * <p>
+ * S2 选项菜单与 S3 删除子菜单均为底部弹出的 DialogFragment
+ * （样式与「功能表→应用程序→选中JAR的选项菜单」一致），弹窗内已接入 NokiaKeyBinding。
+ */
+public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusHost {
+
+	private static final String TAG = "WidgetSettings";
+
+	private static final int MODE_NORMAL = 0;   // S1
+	private static final int MODE_DELETE = 1;   // S3
+	private static final int MODE_SORT = 2;     // S4 / S5
+
+	private LinearLayout listLayout;
+	private ScrollView scroll;
+	private TextView tvStatus;
+
+	private NokiaWidgetStorage storage;
+	private final List<NokiaWidgetItem> widgets = new ArrayList<>();
+	private View[] itemViews;
+	private int focusIndex = -1;
+	private View selectedView = null;
+
+	private int mode = MODE_NORMAL;
+
+	// 排序拎起态（S5）
+	private boolean lifted = false;
+	private int liftedIndex = -1;
+
+	// 删除模式勾选（与 widgets 下标一一对应）
+	private final List<Boolean> checked = new ArrayList<>();
+
+	private Toast toast;
+
+	@Nullable
+	@Override
+	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+							 @Nullable Bundle savedInstanceState) {
+		return inflater.inflate(R.layout.fragment_nokia_widget_settings, container, false);
+	}
+
+	@Override
+	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+		super.onViewCreated(view, savedInstanceState);
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		host.scaleMidContent(view, true);
+
+		View wall = host.findViewById(R.id.wallpaper);
+		if (wall != null) {
+			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
+		}
+		TextView title = host.findViewById(R.id.topTitle);
+		if (title != null) {
+			title.setText("桌面组件设置");
+		}
+
+		storage = new NokiaWidgetStorage(requireContext());
+		listLayout = view.findViewById(R.id.widgetListLayout);
+		scroll = view.findViewById(R.id.widgetScroll);
+		tvStatus = view.findViewById(R.id.tvWidgetStatus);
+
+		// 运行时约束 ScrollView 高度，使列表底部正好落在可视区底边（同快捷栏设置）
+		view.post(() -> {
+			if (scroll == null) return;
+			View parent = (View) view.getParent();
+			if (!(parent instanceof View)) {
+				NokiaLog.w(TAG, "parent is not a View, skip height constraint");
+				return;
+			}
+			int panelH = ((View) parent).getHeight();
+			float scale = view.getScaleX();
+			if (scale <= 0) scale = 1;
+			int visibleH = (int) (panelH / scale);
+			int headH = scroll.getTop();
+			int scrollH = visibleH - headH;
+			if (scrollH > 0) {
+				ViewGroup.LayoutParams lp = scroll.getLayoutParams();
+				lp.height = scrollH;
+				scroll.setLayoutParams(lp);
+				NokiaLog.i(TAG, "约束ScrollView高度: panelH=" + panelH
+						+ " scale=" + scale + " visibleH=" + visibleH
+						+ " headH=" + headH + " scrollH=" + scrollH);
+			} else {
+				NokiaLog.w(TAG, "scrollH <= 0, skip height constraint: scrollH=" + scrollH);
+			}
+		});
+
+		widgets.clear();
+		widgets.addAll(storage.getWidgets());
+		NokiaLog.i(TAG, "桌面组件设置初始化完成，组件数=" + widgets.size());
+
+		mode = MODE_NORMAL;
+		rebuildList();
+		updateBottomBar();
+	}
+
+	// ---- NokiaFocusHost ----
+
+	@Override
+	public boolean onDirection(int direction) {
+		dismissToastIfShown();
+		switch (mode) {
+			case MODE_NORMAL:
+			case MODE_DELETE:
+				return onListDirection(direction);
+			case MODE_SORT:
+				return lifted ? onLiftedDirection(direction) : onListDirection(direction);
+			default:
+				return false;
+		}
+	}
+
+	@Override
+	public boolean onSelect() {
+		dismissToastIfShown();
+		switch (mode) {
+			case MODE_NORMAL:
+				onConfirmWidget();
+				return true;
+			case MODE_DELETE:
+				if (focusIndex >= 0 && focusIndex < widgets.size()) {
+					toggleChecked(focusIndex);
+				}
+				return true;
+			case MODE_SORT:
+				if (lifted) {
+					dropLifted();
+				} else {
+					liftCurrent();
+				}
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	@Override
+	public boolean onSoftLeft() {
+		dismissToastIfShown();
+		switch (mode) {
+			case MODE_NORMAL:
+				showOptionsDialog();
+				return true;
+			case MODE_DELETE:
+				showDeleteDialog();
+				return true;
+			case MODE_SORT:
+				return true; // 排序模式左软键无效果
+			default:
+				return false;
+		}
+	}
+
+	@Override
+	public boolean onSoftRight() {
+		dismissToastIfShown();
+		switch (mode) {
+			case MODE_NORMAL:
+				exitCurrent();
+				return true;
+			case MODE_DELETE:
+				backToNormal();
+				return true;
+			case MODE_SORT:
+				saveSortAndExit();
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	@Override
+	public boolean onBack() {
+		dismissToastIfShown();
+		switch (mode) {
+			case MODE_NORMAL:
+				exitCurrent();
+				return true;
+			case MODE_DELETE:
+				backToNormal();
+				return true;
+			case MODE_SORT:
+				saveSortAndExit();
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	// ---- S1 确认键行为 ----
+
+	private void onConfirmWidget() {
+		if (widgets.isEmpty()) return;
+		if (focusIndex < 0 || focusIndex >= widgets.size()) return;
+		NokiaWidgetItem item = widgets.get(focusIndex);
+		if (item.isEditable()) {
+			// 应用/网址/Activity 的编辑页在后续文档定义，暂未实现
+			NokiaLog.i(TAG, "确认键：可编辑组件，编辑页待实现 label=" + item.label);
+			showToast("该类型编辑功能待实现");
+		} else {
+			NokiaLog.i(TAG, "确认键：该组件不可编辑 label=" + item.label);
+			showToast("该组件不可编辑");
+		}
+	}
+
+	// ---- S2 选项菜单（底部弹出弹窗） ----
+
+	private void showOptionsDialog() {
+		boolean canAdd = widgets.size() < NokiaWidgetItem.MAX_COUNT;
+		boolean canDelete = !widgets.isEmpty();
+		boolean canSort = widgets.size() > 1;
+		NokiaWidgetOptionsDialog dialog = NokiaWidgetOptionsDialog.newInstance(
+				"选项",
+				new String[]{"添加组件", "删除组件", "组件排序"},
+				new boolean[]{canAdd, canDelete, canSort},
+				new int[]{android.R.drawable.ic_menu_add,
+						android.R.drawable.ic_menu_delete,
+						android.R.drawable.ic_menu_sort_by_size});
+		dialog.setOptionsListener(index -> {
+			switch (index) {
+				case 0:
+					openTypePicker();
+					break;
+				case 1:
+					enterDeleteMode();
+					break;
+				case 2:
+					enterSortMode();
+					break;
+				default:
+					break;
+			}
+		});
+		dialog.show(getParentFragmentManager(), "widget_options");
+		NokiaLog.i(TAG, "弹出选项菜单弹窗: canAdd=" + canAdd + " canDelete=" + canDelete + " canSort=" + canSort);
+	}
+
+	private void openTypePicker() {
+		NokiaLog.i(TAG, "打开组件类型选择页（S6）");
+		((NokiaDesktopActivity) requireActivity()).openFragment(new NokiaWidgetTypePickerFragment());
+	}
+
+	// ---- S3 删除模式 ----
+
+	private void enterDeleteMode() {
+		mode = MODE_DELETE;
+		checked.clear();
+		for (int i = 0; i < widgets.size(); i++) {
+			checked.add(false);
+		}
+		rebuildList();
+		updateBottomBar();
+		NokiaLog.i(TAG, "进入删除模式，共 " + widgets.size() + " 项");
+	}
+
+	private void showDeleteDialog() {
+		NokiaWidgetDeleteDialog dialog = new NokiaWidgetDeleteDialog();
+		dialog.setListener(new NokiaWidgetDeleteDialog.Listener() {
+			@Override
+			public void onSelectAllToggle() {
+				toggleSelectAll();
+			}
+
+			@Override
+			public void onDeleteSelected() {
+				deleteSelected();
+			}
+
+			@Override
+			public boolean isAllChecked() {
+				return allChecked();
+			}
+
+			@Override
+			public int getCheckedCount() {
+				return checkedCount();
+			}
+		});
+		dialog.show(getParentFragmentManager(), "widget_delete");
+		NokiaLog.i(TAG, "弹出删除子菜单弹窗");
+	}
+
+	private void toggleChecked(int index) {
+		if (index < 0 || index >= checked.size()) return;
+		checked.set(index, !checked.get(index));
+		if (itemViews != null && index < itemViews.length && itemViews[index] != null) {
+			View row = itemViews[index];
+			TextView check = row.findViewWithTag("check_" + index);
+			if (check != null) {
+				boolean isChecked = checked.get(index);
+				check.setText(isChecked ? "[✓]" : "[ ]");
+				check.setTextColor(isChecked ? 0xFF4CAF50 : 0xFF888888);
+			}
+		}
+		NokiaLog.d(TAG, "切换勾选 index=" + index + " -> " + checked.get(index));
+	}
+
+	private boolean allChecked() {
+		if (checked.isEmpty()) return false;
+		for (Boolean b : checked) {
+			if (!b) return false;
+		}
+		return true;
+	}
+
+	private int checkedCount() {
+		int count = 0;
+		for (Boolean b : checked) {
+			if (b) count++;
+		}
+		return count;
+	}
+
+	private void toggleSelectAll() {
+		boolean all = allChecked();
+		for (int i = 0; i < checked.size(); i++) {
+			checked.set(i, !all);
+		}
+		rebuildList();
+		NokiaLog.i(TAG, "全选/取消全选: 当前勾选 " + checkedCount() + " 项");
+	}
+
+	private void deleteSelected() {
+		List<NokiaWidgetItem> toRemove = new ArrayList<>();
+		for (int i = 0; i < checked.size(); i++) {
+			if (checked.get(i)) {
+				toRemove.add(widgets.get(i));
+			}
+		}
+		if (toRemove.isEmpty()) {
+			NokiaLog.w(TAG, "删除已选：无勾选项");
+			return;
+		}
+		NokiaLog.i(TAG, "删除已选组件 " + toRemove.size() + " 个");
+		storage.removeWidgets(toRemove);
+		backToNormal();
+	}
+
+	private void backToNormal() {
+		mode = MODE_NORMAL;
+		lifted = false;
+		liftedIndex = -1;
+		checked.clear();
+		rebuildList();
+		updateBottomBar();
+		NokiaLog.i(TAG, "回到 S1 正常浏览");
+	}
+
+	// ---- S4 / S5 排序模式 ----
+
+	private void enterSortMode() {
+		mode = MODE_SORT;
+		lifted = false;
+		liftedIndex = -1;
+		rebuildList();
+		updateBottomBar();
+		NokiaLog.i(TAG, "进入排序模式（光标态）");
+	}
+
+	private void liftCurrent() {
+		if (focusIndex < 0 || focusIndex >= widgets.size()) return;
+		lifted = true;
+		liftedIndex = focusIndex;
+		applyListHighlight();
+		NokiaLog.i(TAG, "拎起行 index=" + liftedIndex);
+	}
+
+	private void dropLifted() {
+		if (!lifted) return;
+		focusIndex = liftedIndex;
+		lifted = false;
+		liftedIndex = -1;
+		applyListHighlight();
+		NokiaLog.i(TAG, "放下行 -> 光标落回 index=" + focusIndex);
+	}
+
+	private void swapWidgets(int a, int b) {
+		NokiaWidgetItem tmp = widgets.get(a);
+		widgets.set(a, widgets.get(b));
+		widgets.set(b, tmp);
+		NokiaLog.d(TAG, "交换行 " + a + " <-> " + b);
+	}
+
+	private void saveSortAndExit() {
+		lifted = false;
+		liftedIndex = -1;
+		storage.setWidgets(widgets);
+		NokiaLog.i(TAG, "保存组件排序并退出");
+		exitCurrent();
+	}
+
+	// ---- 方向键 ----
+
+	private boolean onListDirection(int direction) {
+		int count = itemViews != null ? itemViews.length : 0;
+		if (count == 0) return false;
+		if (focusIndex < 0) {
+			setFocusIndex(0);
+			return true;
+		}
+		switch (direction) {
+			case NokiaKeyBinding.ACTION_UP:
+				if (focusIndex > 0) setFocusIndex(focusIndex - 1);
+				return true;
+			case NokiaKeyBinding.ACTION_DOWN:
+				if (focusIndex < count - 1) setFocusIndex(focusIndex + 1);
+				return true;
+			default:
+				return true;
+		}
+	}
+
+	private boolean onLiftedDirection(int direction) {
+		if (liftedIndex < 0) return true;
+		if (direction == NokiaKeyBinding.ACTION_UP && liftedIndex > 0) {
+			swapWidgets(liftedIndex, liftedIndex - 1);
+			liftedIndex--;
+			rebuildList();
+			applyListHighlight();
+			return true;
+		}
+		if (direction == NokiaKeyBinding.ACTION_DOWN && liftedIndex < widgets.size() - 1) {
+			swapWidgets(liftedIndex, liftedIndex + 1);
+			liftedIndex++;
+			rebuildList();
+			applyListHighlight();
+			return true;
+		}
+		return true; // 边界不环绕
+	}
+
+	// ---- 构建列表 ----
+
+	private void rebuildList() {
+		if (listLayout == null) return;
+		listLayout.removeAllViews();
+
+		if (widgets.isEmpty()) {
+			TextView empty = new TextView(requireContext());
+			empty.setText("暂无组件，按左软键添加");
+			empty.setTextColor(0xFFAAAAAA);
+			empty.setTextSize(12);
+			empty.setGravity(Gravity.CENTER);
+			empty.setPadding(0, dp(20), 0, 0);
+			listLayout.addView(empty);
+			itemViews = new View[0];
+			focusIndex = -1;
+			selectedView = null;
+			updateStatusText();
+			return;
+		}
+
+		itemViews = new View[widgets.size()];
+		for (int i = 0; i < widgets.size(); i++) {
+			NokiaWidgetItem item = widgets.get(i);
+
+			LinearLayout row = new LinearLayout(requireContext());
+			row.setOrientation(LinearLayout.HORIZONTAL);
+			row.setGravity(Gravity.CENTER_VERTICAL);
+			row.setLayoutParams(new LinearLayout.LayoutParams(
+					LinearLayout.LayoutParams.MATCH_PARENT, dp(34)));
+			row.setPadding(dp(6), dp(2), dp(6), dp(2));
+			row.setClickable(true);
+
+			// 删除模式：行首勾选标记
+			if (mode == MODE_DELETE) {
+				TextView tvCheck = new TextView(requireContext());
+				tvCheck.setLayoutParams(new LinearLayout.LayoutParams(dp(24), dp(24)));
+				tvCheck.setGravity(Gravity.CENTER);
+				tvCheck.setTextSize(13);
+				boolean isChecked = i < checked.size() && checked.get(i);
+				tvCheck.setText(isChecked ? "[✓]" : "[ ]");
+				tvCheck.setTextColor(isChecked ? 0xFF4CAF50 : 0xFF888888);
+				tvCheck.setTag("check_" + i);
+				row.addView(tvCheck);
+			}
+
+			// 图标
+			ImageView iv = new ImageView(requireContext());
+			iv.setLayoutParams(new LinearLayout.LayoutParams(dp(20), dp(20)));
+			try {
+				iv.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+						NokiaWidgetItem.getTypeIcon(item.type)));
+			} catch (Exception ignored) {
+				NokiaLog.w(TAG, "加载组件图标失败 type=" + item.type);
+			}
+			row.addView(iv);
+
+			// 间距
+			row.addView(spaceView(dp(6), 1));
+
+			// 名称
+			TextView tv = new TextView(requireContext());
+			tv.setLayoutParams(new LinearLayout.LayoutParams(
+					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+			tv.setText(item.label);
+			tv.setTextColor(0xFFFFFFFF);
+			tv.setTextSize(12);
+			tv.setSingleLine(true);
+			tv.setEllipsize(TextUtils.TruncateAt.END);
+			row.addView(tv);
+
+			// 类型标签（灰色小字）
+			TextView tvTag = new TextView(requireContext());
+			tvTag.setLayoutParams(new LinearLayout.LayoutParams(
+					LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+			tvTag.setText(item.getTypeTag());
+			tvTag.setTextColor(0xFF999999);
+			tvTag.setTextSize(9);
+			row.addView(tvTag);
+
+			final int index = i;
+			row.setOnClickListener(v -> {
+				if (mode == MODE_DELETE) {
+					setFocusIndex(index);
+					toggleChecked(index);
+				} else if (mode == MODE_SORT && lifted) {
+					// 拎起态点击任意行视同放下（回到光标态）
+					dropLifted();
+				} else {
+					setFocusIndex(index);
+					onSelect();
+				}
+			});
+
+			listLayout.addView(row);
+			itemViews[i] = row;
+		}
+
+		if (focusIndex < 0 || focusIndex >= widgets.size()) {
+			focusIndex = 0;
+		}
+		updateStatusText();
+		applyListHighlight();
+	}
+
+	private void updateStatusText() {
+		if (tvStatus == null) return;
+		switch (mode) {
+			case MODE_DELETE:
+				tvStatus.setText("删除模式");
+				break;
+			case MODE_SORT:
+				tvStatus.setText("排序模式");
+				break;
+			default:
+				tvStatus.setText("已选 " + widgets.size() + " / " + NokiaWidgetItem.MAX_COUNT + " 项");
+				break;
+		}
+	}
+
+	private void updateBottomBar() {
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		switch (mode) {
+			case MODE_DELETE:
+				host.setBottomBar("选项", null, "取消");
+				break;
+			case MODE_SORT:
+				host.setBottomBar(null, null, "完成");
+				break;
+			default:
+				host.setBottomBar("选项", null, "返回");
+				break;
+		}
+	}
+
+	// ---- 焦点管理 ----
+
+	private void setFocusIndex(int index) {
+		if (itemViews == null || index < 0 || index >= itemViews.length) return;
+		clearListHighlight();
+		focusIndex = index;
+		applyListHighlight();
+		scrollToVisible(index);
+	}
+
+	/**
+	 * 确保焦点行在 ScrollView 可见区域内，方向键导航时自动跟随滚动。
+	 */
+	private void scrollToVisible(int index) {
+		if (scroll == null || itemViews == null || index < 0 || index >= itemViews.length) return;
+		View item = itemViews[index];
+		if (item == null) return;
+		scroll.post(() -> {
+			int scrollY = scroll.getScrollY();
+			int itemTop = item.getTop();
+			int itemBottom = item.getBottom();
+			int svHeight = scroll.getHeight();
+			if (svHeight <= 0) return;
+			if (itemTop < scrollY) {
+				scroll.smoothScrollTo(0, itemTop);
+				NokiaLog.d(TAG, "↑ 滚动至 item " + index + " top=" + itemTop);
+			} else if (itemBottom > scrollY + svHeight) {
+				scroll.smoothScrollTo(0, itemBottom - svHeight);
+				NokiaLog.d(TAG, "↓ 滚动至 item " + index + " bottom=" + itemBottom + " svH=" + svHeight);
+			}
+		});
+	}
+
+	private void applyListHighlight() {
+		clearListHighlight();
+		if (itemViews == null) return;
+		if (mode == MODE_SORT && lifted && liftedIndex >= 0 && liftedIndex < itemViews.length) {
+			// 拎起行：独立视觉样式
+			itemViews[liftedIndex].setBackgroundResource(R.drawable.bg_nokia_lifted);
+			selectedView = itemViews[liftedIndex];
+		} else if (focusIndex >= 0 && focusIndex < itemViews.length) {
+			itemViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+			selectedView = itemViews[focusIndex];
+		}
+	}
+
+	private void clearListHighlight() {
+		if (selectedView != null) {
+			selectedView.setBackgroundResource(0);
+			selectedView = null;
+		}
+	}
+
+	// ---- Toast（不可编辑提示） ----
+
+	private void showToast(String msg) {
+		if (toast != null) {
+			toast.cancel();
+		}
+		toast = Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT);
+		toast.show();
+		NokiaLog.i(TAG, "Toast: " + msg);
+	}
+
+	private void dismissToastIfShown() {
+		if (toast != null) {
+			toast.cancel();
+			toast = null;
+		}
+	}
+
+	private void exitCurrent() {
+		((NokiaDesktopActivity) requireActivity()).exitCurrent();
+	}
+
+	private int dp(int v) {
+		return (int) (v * getResources().getDisplayMetrics().density);
+	}
+
+	private View spaceView(int w, int h) {
+		View v = new View(requireContext());
+		v.setLayoutParams(new LinearLayout.LayoutParams(w, h));
+		return v;
+	}
+}

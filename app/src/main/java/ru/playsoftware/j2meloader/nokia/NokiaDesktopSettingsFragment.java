@@ -166,8 +166,8 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaFocus
 				// TODO: 壁纸设置
 				return true;
 			case 2:
-				NokiaLog.i("DesktopSettings", "桌面组件设置（待实现）");
-				// TODO: 桌面组件设置
+				NokiaLog.i("DesktopSettings", "进入桌面组件设置");
+				host.openFragment(new NokiaWidgetSettingsFragment());
 				return true;
 			case 3:
 				NokiaLog.i("DesktopSettings", "按键绑定");
