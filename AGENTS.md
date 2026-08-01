@@ -1,7 +1,6 @@
 # CODEBUDDY.md This file provides guidance to CodeBuddy when working with code in this repository.
 
 
-
 ##  目标概述
 
 本应用的目标是成为一个**诺基亚风格的全功能安卓桌面启动器（Launcher）**，在J2ME-Loader的基础上修改而来，并作为系统默认 Home 桌面运行。核心诉求：
@@ -80,6 +79,32 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 - 在弹窗 `onCreate` 里通过 `((NokiaDesktopActivity) requireActivity()).getKeyBinding()` 取得真实绑定实例（`NokiaDesktopActivity` 已暴露 public 方法）。
 - `setOnKeyListener` 里先 `keyBinding.resolveAction(event)` 解析成动作，再按动作分发；`KEYCODE_BACK` 由弹窗自己单独处理（`NokiaKeyBinding` 不管 BACK）。
 - 已有案例：`NokiaUninstallDialog` 当前是写死 + 硬编码 `KEYCODE_MENU` 才"恰好能用"，同样未接入绑定，属于同类隐患，应一并改成接入 `NokiaKeyBinding`；新增 / 修改任何弹窗、菜单按键逻辑时，一律以接入 `NokiaKeyBinding` 为标准，与桌面行为 100% 一致。
+
+
+## 物理按键 DOWN / UP 配对规范（重要）
+
+**只要在 Activity / Fragment 层消费了某个按键的 `ACTION_DOWN`，就必须把对应的 `UP`（必要时含 `REPEAT`）一并消费，禁止只消费 DOWN 就放手。** 这是 Android 输入管线的一个经典坑，曾导致 320×480 设备上「一次确认键按压被识别成两次动作」。
+
+背景与原因（2026-08 实测 bug：添加应用组件确认键连发两次动作）：
+
+1. `NokiaDesktopActivity.dispatchKeyEvent` 旧实现只处理 `ACTION_DOWN`，非 DOWN 事件一律 `return super.dispatchKeyEvent(event)` 放行到 view 层级。
+2. 按键处理时 `flashBottomBar(ACTION_SELECT)` 会对底部中间软键 `setPressed(true)`（延时 100ms 复位）。DOWN 已被本层消费（view 从未收到 DOWN），但 **UP 到达 view 层级时该 View 仍处于 pressed 且 clickable / focusable**，系统会在 UP 时自动合成 `performClick()` → 底部栏 `setOnClickListener` 再次 `dispatchActionToHost(ACTION_SELECT)` → 第二次动作。
+3. 第二次动作恰好落在**刚切换完成的新 Fragment** 上，于是表现为：S6 确认「应用」→ 自动选中第一个应用；ADD 确认出栈回 S1 → 自动选中组件进入 EDIT（「更换应用」）。
+4. **跨版本 / 跨设备差异会掩盖时序 bug**：该 bug 只在 320×480（Android 13，确认键为 `ENTER`）复现；240×320（Android 4.4，确认键为 `DPAD_CENTER`）的 UP→click 合成行为与 Fragment 切换时序不同，完全不触发。**不要因为某个机型"没复现"就认为没问题。**
+
+正确做法（已修复，见 `NokiaDesktopActivity.java`）：
+
+- 用字段记录最近一次被本层消费的 keyCode：`private int lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;`
+- `dispatchKeyEvent` 的非 DOWN 分支：若 `event.getKeyCode() == lastHandledDownKeyCode` → 记日志并 `return true`（吞掉 UP/REPEAT，杜绝 click 合成）；否则才 `return super...`。
+- 在所有 DOWN 被消费并 `return true` 的路径设置该字段：录制态捕获、BACK→`host.onBack()`、锁屏动作、`dispatchActionToHost(...) == true`。
+- 在所有 DOWN **未消费**交给系统的路径复位为 `KEYCODE_UNKNOWN`，否则会误吞后续无关按键的 UP。
+- 未绑定键 / EditText 打字键的 DOWN 走系统，字段被复位，UP 正常透传，搜索框物理键盘输入不受影响（与 `NokiaKeyBinding.dispatchDialogKey` 已消费非 DOWN 事件的既有模式一致）。
+
+关键认知：
+
+- **消费了 DOWN 不等于消费了整次按键**；被本层消费 DOWN 的按键，其 UP 必须同步拦截，否则会穿透到 view 层级。
+- **警惕「按下状态 + 可点击」的合成点击**：任何在按键处理期间 `setPressed(true)` 的可点击 View，都可能因后续 UP 而被系统合成 `performClick`——即使该 View 从未收到过 DOWN。
+- 新增 / 修改任何按键分发、底部栏视觉反馈逻辑时，以「输入事件完整配对」为标准自查，而不是按某个机型打补丁。
 
 
 ## 软键栏（底部左右菜单）禁止加高亮 / 焦点逻辑（重要）
@@ -380,3 +405,4 @@ This is not a normal app — it is an emulator, so most of the "application logi
 
 **Release signing.** `signingConfigs.release` reads `keystore.properties` (when not running on the Bitrise CI). Debug builds use the default debug key; release builds need the local `test.jks`.
 
+   

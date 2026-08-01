@@ -30,6 +30,14 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	private NokiaKeyBinding keyBinding;
 	/** Activity 是否处于 resumed 状态（延迟任务防重入校验用） */
 	private boolean resumedFlag = false;
+	/**
+	 * 最近一次被本层在 ACTION_DOWN 阶段消费的按键 keyCode。
+	 * 用于把对应的 UP / REPEAT 一并拦截：由于 DOWN 没落到 view 层级，
+	 * 若放行 UP，系统会基于底部软键曾 setPressed 的状态合成 performClick，
+	 * 导致物理确认键一次按压被识别成两次动作（320×480 实测 bug）。
+	 * 复位为 KEYCODE_UNKNOWN 表示当前无待配对事件。
+	 */
+	private int lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -194,6 +202,15 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {
 		if (event.getAction() != KeyEvent.ACTION_DOWN) {
+			// 若此前对应的 DOWN 已被本层消费，则把 UP / REPEAT 一并吞掉：
+			// 避免它落入 view 层级（底部软键仍处于 pressed）被系统合成 performClick，
+			// 导致一次按压触发两次动作。
+			if (event.getKeyCode() == lastHandledDownKeyCode) {
+				NokiaLog.d("Desktop", "dispatchKeyEvent 拦截已消费按键的 "
+						+ (event.getAction() == KeyEvent.ACTION_UP ? "UP" : "REPEAT")
+						+ " " + NokiaLog.keyName(event.getKeyCode()));
+				return true;
+			}
 			return super.dispatchKeyEvent(event);
 		}
 
@@ -216,6 +233,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 			// 不会在这里用返回键实现。
 			NokiaLog.i("Desktop", "录制态捕获按键 " + NokiaLog.keyName(kc));
 			rec.onKeyRecorded(kc);
+			lastHandledDownKeyCode = kc;
 			return true;
 		}
 
@@ -229,12 +247,14 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 						&& !(backHost instanceof NokiaDesktopFragment)) {
 					NokiaLog.d("Desktop", "未绑定返回键 -> host.onBack()");
 					((NokiaFocusHost) backHost).onBack();
+					lastHandledDownKeyCode = event.getKeyCode();
 					return true;
 				}
 			}
 			// 未绑定的按键：允许系统继续处理（如音量键仍然调整音量）
 			NokiaLog.d("Desktop", "未绑定的按键 " + NokiaLog.keyName(event.getKeyCode())
 					+ "，交给系统处理");
+			resetLastHandledKeyCode();
 			return super.dispatchKeyEvent(event);
 		}
 
@@ -248,9 +268,11 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 			if (lockHost instanceof NokiaDesktopFragment) {
 				NokiaLog.i("Desktop", "锁屏动作触发（桌面）：执行锁屏");
 				lockScreen();
+				lastHandledDownKeyCode = event.getKeyCode();
 				return true;
 			}
 			NokiaLog.d("Desktop", "锁屏动作当前非桌面，交由系统处理");
+			resetLastHandledKeyCode();
 			return super.dispatchKeyEvent(event);
 		}
 
@@ -261,12 +283,19 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		if (dispatchActionToHost(action)) {
 			NokiaLog.d("Desktop", "动作 " + NokiaKeyBinding.getActionName(action)
 					+ " 已被当前 Fragment 消费");
+			lastHandledDownKeyCode = event.getKeyCode();
 			return true;
 		}
 
 		NokiaLog.d("Desktop", "dispatchKeyEvent 未消费 " + NokiaLog.keyName(event.getKeyCode())
 				+ "，交给系统");
+		resetLastHandledKeyCode();
 		return super.dispatchKeyEvent(event);
+	}
+
+	/** 复位「已消费 DOWN 的 keyCode」，用于本层未消费该按键的路径，避免误吞后续 UP。 */
+	private void resetLastHandledKeyCode() {
+		lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;
 	}
 
 	/**
