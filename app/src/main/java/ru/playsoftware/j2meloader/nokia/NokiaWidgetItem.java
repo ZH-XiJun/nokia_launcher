@@ -3,6 +3,8 @@ package ru.playsoftware.j2meloader.nokia;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Objects;
+
 import ru.playsoftware.j2meloader.R;
 
 /**
@@ -104,6 +106,22 @@ public class NokiaWidgetItem {
 			case TYPE_USAGE: return "使用时长";
 			default: return "组件";
 		}
+	}
+
+	/** 以 type + label + value 作为身份标识（iconPath 可能为空，不参与比较）。 */
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+		NokiaWidgetItem that = (NokiaWidgetItem) o;
+		return type == that.type
+				&& Objects.equals(label, that.label)
+				&& Objects.equals(value, that.value);
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(type, label, value);
 	}
 
 	/** 类型对应的图标资源 ID（S1 行图标 / S6 类型图标）。 */
