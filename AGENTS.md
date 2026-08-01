@@ -405,4 +405,3 @@ This is not a normal app — it is an emulator, so most of the "application logi
 
 **Release signing.** `signingConfigs.release` reads `keystore.properties` (when not running on the Bitrise CI). Debug builds use the default debug key; release builds need the local `test.jks`.
 
-   
