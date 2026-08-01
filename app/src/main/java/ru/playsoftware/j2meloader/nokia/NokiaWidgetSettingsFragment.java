@@ -172,7 +172,8 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 				showDeleteDialog();
 				return true;
 			case MODE_SORT:
-				return true; // 排序模式左软键无效果
+				finishSort();
+				return true;
 			default:
 				return false;
 		}
@@ -189,8 +190,7 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 				backToNormal();
 				return true;
 			case MODE_SORT:
-				saveSortAndExit();
-				return true;
+				return true; // 排序模式右软键无按钮（完成在左）
 			default:
 				return false;
 		}
@@ -207,7 +207,7 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 				backToNormal();
 				return true;
 			case MODE_SORT:
-				saveSortAndExit();
+				finishSort();
 				return true;
 			default:
 				return false;
@@ -381,6 +381,7 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 		liftedIndex = -1;
 		rebuildList();
 		updateBottomBar();
+		showToast("按下确认键选中组件进行排序");
 		NokiaLog.i(TAG, "进入排序模式（光标态）");
 	}
 
@@ -408,12 +409,12 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 		NokiaLog.d(TAG, "交换行 " + a + " <-> " + b);
 	}
 
-	private void saveSortAndExit() {
+	private void finishSort() {
 		lifted = false;
 		liftedIndex = -1;
 		storage.setWidgets(widgets);
-		NokiaLog.i(TAG, "保存组件排序并退出");
-		exitCurrent();
+		NokiaLog.i(TAG, "保存组件排序并退出排序模式");
+		backToNormal();
 	}
 
 	// ---- 方向键 ----
@@ -583,7 +584,7 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 				host.setBottomBar("选项", null, "取消");
 				break;
 			case MODE_SORT:
-				host.setBottomBar(null, null, "完成");
+				host.setBottomBar("完成", null, null);
 				break;
 			default:
 				host.setBottomBar("选项", null, "返回");
@@ -628,12 +629,24 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaFocusH
 		clearListHighlight();
 		if (itemViews == null) return;
 		if (mode == MODE_SORT && lifted && liftedIndex >= 0 && liftedIndex < itemViews.length) {
-			// 拎起行：独立视觉样式
-			itemViews[liftedIndex].setBackgroundResource(R.drawable.bg_nokia_lifted);
-			selectedView = itemViews[liftedIndex];
+			// 拎起行：独立视觉样式（亮蓝底 + 亮青边框 + 增高，模拟"抓起/抬起"）
+			View liftedRow = itemViews[liftedIndex];
+			liftedRow.setBackgroundResource(R.drawable.bg_nokia_lifted);
+			LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) liftedRow.getLayoutParams();
+			if (lp != null) {
+				lp.height = dp(40);
+				liftedRow.setLayoutParams(lp);
+			}
+			selectedView = liftedRow;
 		} else if (focusIndex >= 0 && focusIndex < itemViews.length) {
-			itemViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
-			selectedView = itemViews[focusIndex];
+			View focusRow = itemViews[focusIndex];
+			focusRow.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+			LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) focusRow.getLayoutParams();
+			if (lp != null && lp.height != dp(34)) {
+				lp.height = dp(34);
+				focusRow.setLayoutParams(lp);
+			}
+			selectedView = focusRow;
 		}
 	}
 
