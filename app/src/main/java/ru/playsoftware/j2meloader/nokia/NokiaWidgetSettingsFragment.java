@@ -67,6 +67,17 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 	}
 
 	@Override
+	public void onResume() {
+		super.onResume();
+		if (storage == null) return;
+		widgets.clear();
+		widgets.addAll(storage.getWidgets());
+		NokiaLog.i(TAG, "onResume 重载组件列表，数量=" + widgets.size());
+		rebuildList();
+		updateBottomBar();
+	}
+
+	@Override
 	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		super.onViewCreated(view, savedInstanceState);
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
@@ -380,6 +391,8 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 		}
 		NokiaLog.i(TAG, "删除已选组件 " + toRemove.size() + " 个");
 		storage.removeWidgets(toRemove);
+		widgets.removeAll(toRemove);
+		NokiaLog.i(TAG, "删除后剩余组件 " + widgets.size() + " 个");
 		backToNormal();
 	}
 
