@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Install the latest debug APK from /dist to one or all connected adb devices.
+Install the latest debug APK from the build output directory to one or all
+connected adb devices.
+
+APK is read directly from app/build/outputs/apk/open/debug/ -- no stale /dist
+cache involved.
 
 - No serial arg  -> enumerate every connected adb device and install in
   parallel (non-blocking). One device failing does NOT affect the others.
@@ -16,15 +20,15 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 
-def find_latest_apk(dist_dir):
-    """Return the path of the most recently modified .apk in dist_dir."""
-    if not os.path.isdir(dist_dir):
+def find_latest_apk(apk_dir):
+    """Return the path of the most recently modified .apk in apk_dir."""
+    if not os.path.isdir(apk_dir):
         return None
-    apks = [f for f in os.listdir(dist_dir) if f.lower().endswith(".apk")]
+    apks = [f for f in os.listdir(apk_dir) if f.lower().endswith(".apk")]
     if not apks:
         return None
-    apks.sort(key=lambda f: os.path.getmtime(os.path.join(dist_dir, f)), reverse=True)
-    return os.path.join(dist_dir, apks[0])
+    apks.sort(key=lambda f: os.path.getmtime(os.path.join(apk_dir, f)), reverse=True)
+    return os.path.join(apk_dir, apks[0])
 
 
 def get_devices():
@@ -64,11 +68,11 @@ def install_to(serial, apk_path):
 
 def main():
     root = os.path.dirname(os.path.abspath(__file__))
-    dist_dir = os.path.join(root, "dist")
-    apk_path = find_latest_apk(dist_dir)
+    apk_dir = os.path.join(root, "app", "build", "outputs", "apk", "open", "debug")
+    apk_path = find_latest_apk(apk_dir)
 
     if not apk_path:
-        print(f"[ERROR] No APK found in {dist_dir}. Run build_debug.bat first.")
+        print(f"[ERROR] No APK found in {apk_dir}. Run `gradlew assembleOpenDebug` first.")
         return 1
 
     print(f"Installing APK: {apk_path}")
