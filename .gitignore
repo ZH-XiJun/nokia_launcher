@@ -46,3 +46,6 @@ dist/
 # Agent / IDE data folders (do not commit)
 .codebuddy/
 .claude/
+
+
+docs/bug清单.md
