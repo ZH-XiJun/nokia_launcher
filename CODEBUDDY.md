@@ -203,7 +203,7 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 |---|---|---|---|
 | **主适配** | 240×320 | 4a24ecf（Android 4.4，density 120→160） | 所有界面不崩、不裁切、不错位，点线清晰 |
 | **主适配** | 320×480 | tcpip 设备（density 136→160） | 同上，且顶栏/中间区比例可接受 |
-| **次要适配（兜底）** | 16:9 长屏 | jz5dauzlu8euw4e6（小米，仅 push 安装） | 不崩、不变形、不裁切、可正常操作即可 |
+| **次要适配（兜底）** | 16:9 长屏 | jz5dauzlu8euw4e6 | 不崩、不变形、不裁切、可正常操作即可 |
 
 ### 适配架构（理解后才能改）
 

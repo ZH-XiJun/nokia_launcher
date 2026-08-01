@@ -23,6 +23,8 @@ public class NokiaAppItem {
 	public Drawable icon;
 	/** 启动该应用的 Intent（特殊入口为 null，可被设置以携带 J2ME 数据） */
 	public Intent launchIntent;
+	/** S60 图标资源 ID（构建列表时记录，用于排序分组；0 = 未匹配） */
+	public int s60IconResId;
 
 	public NokiaAppItem(int type, String label, Drawable icon, Intent launchIntent) {
 		this.type = type;

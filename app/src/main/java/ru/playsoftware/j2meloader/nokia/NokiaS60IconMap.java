@@ -67,31 +67,83 @@ public class NokiaS60IconMap {
 
 	// ── Fallback：精确包名匹配（意图匹配不到的知名应用）──
 	private static final Object[][] EXACT_FALLBACK = {
+			// 系统功能类
 			{R.drawable.s60_calendar,  "com.android.calendar", "com.google.android.calendar", "com.miui.calendar"},
 			{R.drawable.s60_contacts,  "com.android.contacts", "com.google.android.contacts", "com.samsung.android.app.contacts"},
 			{R.drawable.s60_call_log,  "com.android.dialer", "com.google.android.dialer"},
-			{R.drawable.s60_browser,   "com.android.chrome", "com.mi.globalbrowser", "com.UCMobile", "com.tencent.mtt", "org.mozilla.firefox"},
 			{R.drawable.s60_mms,       "com.android.mms", "com.google.android.apps.messaging", "com.samsung.android.messaging"},
-			{R.drawable.s60_gallery,   "com.android.gallery3d", "com.miui.gallery", "com.google.android.apps.photos"},
-			{R.drawable.s60_files,     "com.android.fileexplorer", "com.mi.android.globalFileexplorer", "com.android.documentsui", "com.huawei.hidisk", "com.estrongs.android.pop"},
-			{R.drawable.s60_app,       "com.android.vending", "com.xiaomi.market", "com.huawei.appmarket", "com.tencent.android.qqdownloader"},
 			{R.drawable.s60_camera,    "com.android.camera", "com.android.camera2", "com.google.android.GoogleCamera", "com.huawei.camera"},
 			{R.drawable.s60_settings,  "com.android.settings"},
 			{R.drawable.s60_calculator,"com.android.calculator2", "com.miui.calculator", "com.huawei.calculator"},
 			{R.drawable.s60_clock,     "com.android.deskclock", "com.google.android.deskclock", "com.huawei.deskclock"},
-			{R.drawable.s60_email,     "com.android.email", "com.google.android.gm", "com.microsoft.office.outlook"},
-			{R.drawable.s60_music,     "com.android.music", "com.miui.player", "com.tencent.qqmusic", "com.netease.cloudmusic", "com.kugou.android", "com.spotify.music"},
-			{R.drawable.s60_weather,   "com.miui.weather2", "com.huawei.weather"},
-			{R.drawable.s60_navigator, "com.google.android.apps.maps", "com.baidu.BaiduMap", "com.autonavi.minimap", "com.tencent.map"},
-			{R.drawable.s60_notepad,   "com.miui.notes", "com.huawei.notepad", "com.google.android.apps.docs", "com.evernote"},
-			{R.drawable.s60_video_player, "com.mxtech.videoplayer.ad", "com.mxtech.videoplayer.pro"},
 			{R.drawable.s60_sound_recorder, "com.android.soundrecorder", "com.miui.soundrecorder"},
-			{R.drawable.s60_fm_radio,  "com.android.fmradio", "com.miui.fmradio"},
+			{R.drawable.s60_fm_radio,  "com.android.fmradio", "com.miui.fmradio", "com.miui.fm", "com.miui.fmservice"},
+			{R.drawable.s60_downloads, "com.android.providers.downloads.ui"},
+			{R.drawable.s60_search,    "com.xiaomi.scanner"},
+
+			// 浏览器
+			{R.drawable.s60_browser,   "com.android.browser", "com.android.chrome", "com.mi.globalbrowser",
+					"com.UCMobile", "com.tencent.mtt", "org.mozilla.firefox", "alook.browser"},
+
+			// 图库 / 相册
+			{R.drawable.s60_gallery,   "com.android.gallery3d", "com.miui.gallery", "com.google.android.apps.photos"},
+
+			// 文件管理
+			{R.drawable.s60_files,     "com.android.fileexplorer", "com.mi.android.globalFileexplorer",
+					"com.android.documentsui", "com.huawei.hidisk", "com.estrongs.android.pop", "com.rarlab.rar"},
+
+			// 应用商店 / 电商 / 支付
+			{R.drawable.s60_app,       "com.android.vending", "com.xiaomi.market", "com.huawei.appmarket",
+					"com.tencent.android.qqdownloader", "com.coolapk.market",
+					"com.taobao.taobao", "com.jingdong.app.mall", "com.xunmeng.pinduoduo",
+					"com.eg.android.AlipayGphone", "com.xiachufang", "com.xiaomi.smarthome",
+					"com.deepseek.chat", "com.chinamworld.main", "com.ct.client", "com.MobileTicket"},
+
+			// 邮件
+			{R.drawable.s60_email,     "com.android.email", "com.google.android.gm",
+					"com.microsoft.office.outlook", "com.tencent.androidqqmail"},
+
+			// 音乐
+			{R.drawable.s60_music,     "com.android.music", "com.miui.player", "com.tencent.qqmusic",
+					"com.netease.cloudmusic", "com.kugou.android", "com.spotify.music",
+					"com.xiaomi.miplay_client"},
+
+			// 天气
+			{R.drawable.s60_weather,   "com.miui.weather2", "com.huawei.weather"},
+
+			// 导航 / 地图 / 出行
+			{R.drawable.s60_navigator, "com.google.android.apps.maps", "com.baidu.BaiduMap",
+					"com.autonavi.minimap", "com.tencent.map", "com.miui.smarttravel"},
+
+			// 笔记 / 办公
+			{R.drawable.s60_notepad,   "com.miui.notes", "com.huawei.notepad",
+					"com.google.android.apps.docs", "com.evernote",
+					"cn.wps.moffice_eng.xiaomi.lite", "cn.wps.moffice_eng",
+					"com.fenbi.android.servant"},
+
+			// 视频播放
+			{R.drawable.s60_video_player, "com.mxtech.videoplayer.ad", "com.mxtech.videoplayer.pro",
+					"com.ss.android.ugc.aweme.mobile", "com.ss.android.ugc.livelite",
+					"com.bilibili.app.in", "air.tv.douyu.android"},
+
+			// 社交通讯
+			{R.drawable.s60_mms,       "com.tencent.mm", "com.tencent.tim", "io.github.cctyl.wechat"},
 			{R.drawable.s60_whatsapp,  "com.whatsapp", "com.whatsapp.w4b"},
 			{R.drawable.s60_youtube,   "com.google.android.youtube"},
 			{R.drawable.s60_skype,     "com.skype.raider", "com.skype.android"},
-			{R.drawable.s60_downloads, "com.android.providers.downloads.ui"},
-			{R.drawable.s60_books,     "com.google.android.apps.books", "com.amazon.kindle"},
+
+			// 阅读
+			{R.drawable.s60_books,     "com.google.android.apps.books", "com.amazon.kindle",
+					"io.legado.app.release", "com.iflytek.readassistant"},
+
+			// 扫描 / 相机工具
+			{R.drawable.s60_camera,    "com.intsig.camscanner"},
+
+			// 远程控制
+			{R.drawable.s60_remote_control, "com.duokan.phone.remotecontroller", "com.microsoft.rdc.androidx"},
+
+			// 指南针 → 导航图标兜底
+			{R.drawable.s60_navigator, "com.miui.compass"},
 	};
 
 	// ── 缓存 ──
@@ -108,37 +160,41 @@ public class NokiaS60IconMap {
 	private static volatile boolean scanStarted = false;
 
 	// ── 运行时兜底：关键词模糊匹配（包名包含任一关键词则命中）──
+	// 注意：关键词必须互斥，同一关键词不能出现在多个图标行中，否则缓存空/缓存完整时匹配结果不一致。
 	private static final Object[][] FUZZY_FALLBACK = {
 			{R.drawable.s60_calculator, "calculator", "calc"},
 			{R.drawable.s60_clock, "clock", "deskclock", "alarm", "timer"},
 			{R.drawable.s60_calendar, "calendar", "schedule"},
 			{R.drawable.s60_contacts, "contact", "contacts"},
 			{R.drawable.s60_call_log, "dialer", "phone", "call", "telecom"},
-			{R.drawable.s60_browser, "browser", "chrome", "webview"},
-			{R.drawable.s60_mms, "mms", "message", "messaging", "sms", "chat"},
+			{R.drawable.s60_browser, "browser", "chrome", "webview", "ucmobile", "firefox", "alook"},
+			{R.drawable.s60_mms, "mms", "message", "messaging", "sms", "wechat", "mm"},
 			{R.drawable.s60_gallery, "gallery", "photo", "album", "picture"},
-			{R.drawable.s60_files, "file", "explorer", "document", "storage", "disk"},
-			{R.drawable.s60_camera, "camera", "cam"},
-			{R.drawable.s60_settings, "setting", "system", "config"},
-			{R.drawable.s60_music, "music", "player", "song", "audio", "mp3", "spotify", "qqmusic", "kugou", "netease"},
-			{R.drawable.s60_video_player, "video", "movie", "player", "media", "mxplayer", "bilibili", "douyin", "tiktok"},
-			{R.drawable.s60_email, "mail", "email", "outlook"},
+			{R.drawable.s60_files, "file", "explorer", "document", "storage", "disk", "estrongs", "rar"},
+			{R.drawable.s60_camera, "camera", "cam", "camscanner"},
+			{R.drawable.s60_settings, "setting", "config"},
+			{R.drawable.s60_music, "music", "song", "audio", "mp3", "spotify", "qqmusic", "kugou", "netease", "cloudmusic"},
+			{R.drawable.s60_video_player, "video", "movie", "mxplayer", "bilibili", "douyin", "tiktok", "douyu", "aweme"},
+			{R.drawable.s60_email, "mail", "email", "outlook", "gmail", "qqmail"},
 			{R.drawable.s60_weather, "weather", "forecast"},
-			{R.drawable.s60_navigator, "map", "navig", "gps", "location"},
-			{R.drawable.s60_notepad, "note", "memo", "pad", "notepad", "evernote"},
-			{R.drawable.s60_fm_radio, "radio", "fm"},
-			{R.drawable.s60_sound_recorder, "recorder", "record", "voice"},
+			{R.drawable.s60_navigator, "map", "navig", "gps", "location", "baidumap", "autonavi", "minimap", "compass"},
+			{R.drawable.s60_notepad, "note", "memo", "pad", "notepad", "evernote", "wps", "moffice"},
+			{R.drawable.s60_fm_radio, "radio", "fmradio"},
+			{R.drawable.s60_sound_recorder, "recorder", "record", "voice", "soundrecorder"},
 			{R.drawable.s60_downloads, "download"},
 			{R.drawable.s60_whatsapp, "whatsapp"},
 			{R.drawable.s60_youtube, "youtube"},
 			{R.drawable.s60_skype, "skype"},
-			{R.drawable.s60_app, "market", "store", "appstore", "vending"},
-			{R.drawable.s60_search, "search", "assistant"},
-			{R.drawable.s60_books, "book", "reader", "kindle", "read"},
+			{R.drawable.s60_app, "market", "store", "appstore", "vending", "appmarket", "qqdownloader",
+					"taobao", "jd\\.", "pinduoduo", "alipay", "coolapk", "xiachufang", "smarthome",
+					"deepseek", "chinamworld", "mobileticket"},
+			{R.drawable.s60_search, "search", "assistant", "scanner"},
+			{R.drawable.s60_books, "book", "reader", "kindle", "read", "legado", "readassistant"},
 			{R.drawable.s60_dictionary, "dictionary", "dict", "translate", "translator"},
 			{R.drawable.s60_themes, "theme", "wallpaper", "launcher"},
 			{R.drawable.s60_sync, "sync", "backup"},
 			{R.drawable.s60_sdcard, "sdcard"},
+			{R.drawable.s60_remote_control, "remotecontrol", "remotecontroller", "rdc"},
 	};
 
 	// ── 工厂方法 ──
@@ -297,14 +353,22 @@ public class NokiaS60IconMap {
 			}
 		}
 
-		// 第 2 层：精确包名 Fallback（意图匹配不到的应用补上）
+		// 第 2 层：精确包名 Fallback（意图匹配不到但已安装的应用补上）
 		for (Object[] row : EXACT_FALLBACK) {
 			int resId = (int) row[0];
 			for (int i = 1; i < row.length; i++) {
 				String pkg = (String) row[i];
-				if (!newCache.containsKey(pkg)) {
+				if (!newCache.containsKey(pkg) && currentPkgs.contains(pkg)) {
 					newCache.put(pkg, resId);
 				}
+			}
+		}
+
+		// 第 3 层：保留旧缓存中由模糊匹配命中的条目（intent filter 和精确包名未命中时，
+		// 模糊匹配的结果仍然有效，避免缓存刷新后图标突变）
+		for (Map.Entry<String, Integer> e : cache.entrySet()) {
+			if (!newCache.containsKey(e.getKey()) && currentPkgs.contains(e.getKey())) {
+				newCache.put(e.getKey(), e.getValue());
 			}
 		}
 
@@ -325,16 +389,17 @@ public class NokiaS60IconMap {
 	public static int getIcon(String packageName) {
 		if (packageName == null) return 0;
 
-		// 第 1 层：缓存（意图匹配 + 精确包名）
+		// 第 1 层：缓存（意图匹配 + 精确包名 + 模糊匹配已缓存结果）
 		Integer resId = cache.get(packageName);
 		if (resId != null) return resId;
 
-		// 第 2 层：关键词模糊匹配（运行时，覆盖未命中缓存的包名）
+		// 第 2 层：关键词模糊匹配（运行时兜底，命中后写入内存缓存保证结果稳定）
 		String lower = packageName.toLowerCase();
 		for (Object[] entry : FUZZY_FALLBACK) {
 			int iconRes = (int) entry[0];
 			for (int i = 1; i < entry.length; i++) {
 				if (lower.contains((String) entry[i])) {
+					cache.put(packageName, iconRes); // 写入内存缓存，后续调用结果一致
 					return iconRes;
 				}
 			}

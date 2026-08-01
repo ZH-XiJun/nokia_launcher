@@ -230,8 +230,9 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 			launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 			NokiaAppItem item = new NokiaAppItem(NokiaAppItem.TYPE_APP, label, icon, launch);
 
-			// 尝试替换为 S60 风格图标
+			// 尝试替换为 S60 风格图标，同时记录匹配结果用于后续分组排序
 			int s60IconRes = NokiaS60IconMap.getIcon(ai.packageName);
+			item.s60IconResId = s60IconRes;
 			if (s60IconRes != 0) {
 				Drawable s60Icon = safeDrawable(host, s60IconRes);
 				if (s60Icon != null) {
@@ -290,12 +291,12 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 		NokiaLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入原始 MainActivity）");
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_SETTINGS, "桌面设置", settingsIcon, null));
 
-		// 将 pool 拆分为已匹配 S60 图标 和 未匹配，匹配的排在前面
+		// 将 pool 拆分为已匹配 S60 图标 和 未匹配，匹配的排在前面。
+		// 使用构建 pool 时记录的 s60IconResId，避免二次调用 getIcon() 因缓存状态变化导致分组不一致。
 		List<NokiaAppItem> matchedPool = new ArrayList<>();
 		List<NokiaAppItem> unmatchedPool = new ArrayList<>();
 		for (NokiaAppItem app : pool) {
-			int resId = NokiaS60IconMap.getIconForItem(app);
-			if (resId != 0) {
+			if (app.s60IconResId != 0) {
 				matchedPool.add(app);
 			} else {
 				unmatchedPool.add(app);
@@ -342,6 +343,7 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 			if (s60Icon == null) continue;
 			s60Icon.setFilterBitmap(false);
 			item.icon = s60Icon;
+			item.s60IconResId = resId; // 同步更新匹配结果
 			if (cell instanceof LinearLayout) {
 				View iv = ((LinearLayout) cell).getChildAt(0);
 				if (iv instanceof ImageView) {
