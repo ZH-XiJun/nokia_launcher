@@ -281,11 +281,17 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 				} else {
 					visualH = (int) (MID_H * fDensity * fScale);
 				}
-				if (Math.abs(finalScale - 1f) >= 0.001f) {
-					content.setScaleX(finalScale);
-					content.setScaleY(finalScale);
-				}
-				int offset = topAlign ? 0 : Math.max(0, (panelH - visualH) / 2);
+			if (Math.abs(finalScale - 1f) >= 0.001f) {
+				content.setScaleX(finalScale);
+				content.setScaleY(finalScale);
+			} else {
+				// finalScale≈1 时必须显式重置为 1：本方法可能被多次调用，
+				// 若上次缩小（finalScale<1）后本次不再缩小，残留的 scale 会让
+				// 内容宽度继续变小、右侧露出缝隙（如 240x320 mdpi 设备按键绑定界面）。
+				content.setScaleX(1f);
+				content.setScaleY(1f);
+			}
+			int offset = topAlign ? 0 : Math.max(0, (panelH - visualH) / 2);
 				Log.i("NokiaScale", "scaleMidContent layout: panelH=" + panelH
 						+ " contentH=" + contentH + " visualH=" + visualH
 						+ " finalScale=" + finalScale + " offset=" + offset

@@ -1,6 +1,8 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.util.DisplayMetrics;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -37,6 +39,13 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 	private int confirmOccupied = -1;
 	private int confirmChoice = 0; // 0=取消, 1=覆盖
 
+	// 进入防抖：用户按确认键进入本界面时，若按键按下时间较长（触发系统 key repeat）
+	// 或设备按键去抖差产生重复 DOWN 事件，残留的确认键事件会被本界面误解析为
+	// ACTION_SELECT -> onSelect() -> 立即开始录制第一个动作（上）。这里在进入后的一小段时间内
+	// 忽略 SELECT（消费但不录制），防止"进入即录制"。
+	private static final long ENTRY_DEBOUNCE_MS = 800L;
+	private long enteredAt;
+
 	private LinearLayout bindListContainer;
 	private LinearLayout recordStatusBar;
 	private TextView recordStatusText;
@@ -53,6 +62,46 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 		super.onViewCreated(view, savedInstanceState);
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.scaleMidContent(view, true);
+
+		// 记录进入时间，用于防抖：进入界面的残留确认键（key repeat）会被忽略，不触发录制
+		enteredAt = SystemClock.uptimeMillis();
+
+		// 动态调整根视图高度 = panelH / scale，使内容视觉高度恰好填满中间容器：
+		// - 视觉高 < panelH：高度拉高，ScrollView(weight=1) 吸收多余空间（避免底部留白）；
+		// - 视觉高 > panelH：若保持布局固定 262dp，scaleMidContent 会触发"缩小分支"
+		//   （finalScale = panelH / contentH），宽度随比例同步缩小、右侧出现缝隙
+		//   （如 ldpi 的 4a24ecf：宽度缩到 232px，容器 240px，右缝 8px）。
+		//   改为目标高度后 visualH == panelH，不触发缩小，宽度保持铺满。
+		view.post(() -> {
+			View panel = (View) view.getParent();
+			if (panel == null || panel.getHeight() <= 0 || view.getHeight() <= 0) {
+				return;
+			}
+			DisplayMetrics dm = getResources().getDisplayMetrics();
+			float density = dm.density;
+			float widthDp = dm.widthPixels / density;
+			float heightDp = dm.heightPixels / density;
+			// 与 NokiaBaseActivity.scaleMidContent 完全相同的缩放算法
+			float scale = widthDp / 240f;
+			if (320f * scale > heightDp) {
+				scale = heightDp / 320f;
+			}
+			if (Math.abs(scale - Math.round(scale)) < 0.04f) {
+				scale = Math.round(scale);
+			}
+			int panelH = panel.getHeight();
+			int targetH = Math.round(panelH / scale);
+			ViewGroup.LayoutParams lp = view.getLayoutParams();
+			if (lp.height != targetH) {
+				lp.height = targetH;
+				view.setLayoutParams(lp);
+				NokiaLog.i("KeyBind", "调整内容高度=" + targetH + "px 使视觉高=panelH=" + panelH
+						+ "px scale=" + scale);
+				// 高度变化触发重新布局后，重新执行等比缩放（此时 visualH == panelH，
+				// 不触发缩小分支，宽度保持铺满）
+				view.post(() -> host.scaleMidContent(view, true));
+			}
+		});
 
 		keyBinding = new NokiaKeyBinding(requireContext());
 
@@ -320,6 +369,14 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 	public boolean onSelect() {
 		if (confirming) {
 			doConfirm();
+			return true;
+		}
+		// 进入防抖：刚进入界面时的残留确认键（触发进入的那个按键的 repeat DOWN）
+		// 会被误解析为"选择当前焦点项"，导致立即开始录制第一个动作（上）。
+		// 窗口期内消费掉 SELECT 但不进入录制；触摸点击列表行不受影响（不走本方法）。
+		if (SystemClock.uptimeMillis() - enteredAt < ENTRY_DEBOUNCE_MS) {
+			NokiaLog.i("KeyBind", "进入防抖窗口（"
+					+ (SystemClock.uptimeMillis() - enteredAt) + "ms），忽略 SELECT，不触发录制");
 			return true;
 		}
 		NokiaLog.d("KeyBind", "onSelect focus=" + focusIndex);
