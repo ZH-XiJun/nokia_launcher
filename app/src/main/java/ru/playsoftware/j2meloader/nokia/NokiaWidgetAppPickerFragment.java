@@ -687,13 +687,15 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 		switch (direction) {
 			case NokiaKeyBinding.ACTION_UP:
 				if (row == 0) {
-					focusPos = -1; // 宫格第一行按上 → 焦点移到搜索框（不翻页）
-					applyFocus();
-					NokiaLog.d(TAG, "onDirection 上：第一行 → 搜索框");
+					if (pageIndex > 0) {
+						pagePrev(); // 当前页第一行 → 翻到上一页最后一排
+					} else {
+						focusPos = -1; // 第一页第一行 → 焦点移到搜索框
+						applyFocus();
+						NokiaLog.d(TAG, "onDirection 上：第一页第一行 → 搜索框");
+					}
 				} else if ((focusPos - columns) < count) {
 					setFocusPos(focusPos - columns);
-				} else if (pageIndex > 0) {
-					pagePrev();
 				}
 				return true;
 			case NokiaKeyBinding.ACTION_DOWN:
