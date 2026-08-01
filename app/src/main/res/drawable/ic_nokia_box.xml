@@ -1,39 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="9dp"
-        android:height="9dp"
-        android:gravity="top|left">
-        <shape android:shape="rectangle">
-            <solid android:color="#2196F3" />
-            <corners android:radius="1dp" />
-        </shape>
-    </item>
-    <item
-        android:width="9dp"
-        android:height="9dp"
-        android:gravity="top|right">
-        <shape android:shape="rectangle">
-            <solid android:color="#2196F3" />
-            <corners android:radius="1dp" />
-        </shape>
-    </item>
-    <item
-        android:width="9dp"
-        android:height="9dp"
-        android:gravity="bottom|left">
-        <shape android:shape="rectangle">
-            <solid android:color="#2196F3" />
-            <corners android:radius="1dp" />
-        </shape>
-    </item>
-    <item
-        android:width="9dp"
-        android:height="9dp"
-        android:gravity="bottom|right">
-        <shape android:shape="rectangle">
-            <solid android:color="#2196F3" />
-            <corners android:radius="1dp" />
-        </shape>
-    </item>
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 左上 -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M1,0h7a1,1 0 0 1 1,1v7a1,1 0 0 1 -1,1H1a1,1 0 0 1 -1,-1V1a1,1 0 0 1 1,-1z" />
+    <!-- 右上 -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M15,0h8a1,1 0 0 1 1,1v7a1,1 0 0 1 -1,1h-8a1,1 0 0 1 -1,-1V1a1,1 0 0 1 1,-1z" />
+    <!-- 左下 -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M0,15h8a1,1 0 0 1 1,1v7a1,1 0 0 1 -1,1H1a1,1 0 0 1 -1,-1v-7a1,1 0 0 1 1,-1z" />
+    <!-- 右下 -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M15,15h8a1,1 0 0 1 1,1v7a1,1 0 0 1 -1,1h-8a1,1 0 0 1 -1,-1v-7a1,1 0 0 1 1,-1z" />
+</vector>

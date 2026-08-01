@@ -1,32 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="22dp"
-        android:height="20dp"
-        android:gravity="center">
-        <shape android:shape="rectangle">
-            <solid android:color="#FFFFFF" />
-            <corners android:radius="2dp" />
-        </shape>
-    </item>
-    <item
-        android:width="4dp"
-        android:height="4dp"
-        android:gravity="top|left"
-        android:left="4dp"
-        android:top="-3dp">
-        <shape android:shape="rectangle">
-            <solid android:color="#F44336" />
-        </shape>
-    </item>
-    <item
-        android:width="4dp"
-        android:height="4dp"
-        android:gravity="top|right"
-        android:right="4dp"
-        android:top="-3dp">
-        <shape android:shape="rectangle">
-            <solid android:color="#F44336" />
-        </shape>
-    </item>
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 白色圆角日历卡片 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M2,2h20a2,2 0 0 1 2,2v16a2,2 0 0 1 -2,2H2a2,2 0 0 1 -2,-2V4a2,2 0 0 1 2,-2z" />
+    <!-- 左上红色装饰 -->
+    <path
+        android:fillColor="#F44336"
+        android:pathData="M4,1h4v4h-4z" />
+    <!-- 右上红色装饰 -->
+    <path
+        android:fillColor="#F44336"
+        android:pathData="M16,1h4v4h-4z" />
+</vector>

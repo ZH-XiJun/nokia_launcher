@@ -1,6 +1,13 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -536,16 +543,21 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 				row.addView(tvCheck);
 			}
 
-			// 图标
-			ImageView iv = new ImageView(requireContext());
-			iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 20), NokiaDimens.dp(getResources(), 20)));
+		// 图标
+		ImageView iv = new ImageView(requireContext());
+		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 20), NokiaDimens.dp(getResources(), 20)));
+		if (item.type == NokiaWidgetItem.TYPE_APP) {
+			// 应用组件：加载真实应用图标（S60 → 系统图标 → 占位），未命中则后台异步刷新
+			loadAppIcon(item, iv);
+		} else {
 			try {
 				iv.setImageDrawable(ContextCompat.getDrawable(requireContext(),
 						NokiaWidgetItem.getTypeIcon(item.type)));
 			} catch (Exception ignored) {
 				NokiaLog.w(TAG, "加载组件图标失败 type=" + item.type);
 			}
-			row.addView(iv);
+		}
+		row.addView(iv);
 
 			// 间距
 			row.addView(spaceView(NokiaDimens.dp(getResources(), 6), 1));
@@ -593,6 +605,93 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 		}
 		updateStatusText();
 		applyListHighlight();
+	}
+
+	// ---- 应用组件图标加载 ----
+
+	/**
+	 * 为 TYPE_APP 组件加载图标。优先级：S60 风格图标缓存（毫秒级，主线程可安全调用）
+	 * → 系统真实图标（IPC，后台线程）。首帧先用 S60 缓存/占位图标渲染，未命中真实图标时
+	 * 启动后台线程加载系统图标，完成后回主线程更新 ImageView。
+	 */
+	private void loadAppIcon(NokiaWidgetItem item, final ImageView iv) {
+		ComponentName cn = parseAppValue(item.value);
+		if (cn == null) {
+			// value 无法解析（如 J2ME 应用）→ 直接用类型占位图标
+			try {
+				iv.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+						NokiaWidgetItem.getTypeIcon(NokiaWidgetItem.TYPE_APP)));
+			} catch (Exception ignored) {
+				NokiaLog.w(TAG, "加载应用组件占位图标失败");
+			}
+			return;
+		}
+
+		String pkg = cn.getPackageName();
+		// 第 1 优先级：S60 风格图标（读内存缓存，毫秒级，主线程安全）
+		int s60Res = NokiaS60IconMap.getIcon(pkg);
+		if (s60Res != 0) {
+			try {
+				Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
+				if (s60Icon != null) {
+					NokiaLog.d(TAG, "应用组件 " + item.label + " 使用 S60 图标");
+					iv.setImageDrawable(s60Icon);
+					return;
+				}
+			} catch (Exception e) {
+				NokiaLog.w(TAG, "加载 S60 图标失败: " + item.label);
+			}
+		}
+
+		// 第 2 优先级（后台）：系统真实图标。先放占位，避免主线程 IPC 卡顿。
+		try {
+			iv.setImageDrawable(ContextCompat.getDrawable(requireContext(),
+					NokiaWidgetItem.getTypeIcon(NokiaWidgetItem.TYPE_APP)));
+		} catch (Exception ignored) {
+			NokiaLog.w(TAG, "加载应用组件占位图标失败");
+		}
+		loadAppIconAsync(item, cn, iv);
+	}
+
+	/** 解析组件 value 为 ComponentName；J2ME / 非法 value 返回 null。 */
+	private ComponentName parseAppValue(String value) {
+		if (value == null || value.isEmpty()) return null;
+		// J2ME 应用 value 形如 "j2me:label:path"，跳过
+		if (value.startsWith("j2me:")) return null;
+		try {
+			return ComponentName.unflattenFromString(value);
+		} catch (Exception e) {
+			NokiaLog.w(TAG, "解析应用组件 value 失败: " + value);
+			return null;
+		}
+	}
+
+	/** 后台线程加载系统真实图标，完成后回主线程更新 ImageView。 */
+	private void loadAppIconAsync(final NokiaWidgetItem item, final ComponentName cn, final ImageView iv) {
+		final String pkg = cn.getPackageName();
+		final Context appContext = requireContext().getApplicationContext();
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				Drawable icon = null;
+				try {
+					PackageManager pm = appContext.getPackageManager();
+					icon = pm.getActivityIcon(cn);
+				} catch (Exception e) {
+					NokiaLog.w(TAG, "后台加载系统图标失败: " + item.label + " " + e.getMessage());
+				}
+				if (icon == null) return;
+				final Drawable result = icon;
+				new Handler(Looper.getMainLooper()).post(new Runnable() {
+					@Override
+					public void run() {
+						if (!isAdded() || getView() == null) return;
+						iv.setImageDrawable(result);
+						NokiaLog.d(TAG, "应用组件 " + item.label + " 使用系统真实图标");
+					}
+				});
+			}
+		}, "widget-icon-" + pkg).start();
 	}
 
 	private void updateStatusText() {
