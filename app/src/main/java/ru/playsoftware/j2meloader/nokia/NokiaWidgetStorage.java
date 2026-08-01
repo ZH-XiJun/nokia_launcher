@@ -60,6 +60,18 @@ public class NokiaWidgetStorage {
 		NokiaLog.i("WidgetStorage", "setWidgets: 保存 " + widgets.size() + " 个组件");
 	}
 
+	/** 替换指定下标位置的组件（应用/网址/Activity 编辑「换绑」使用）。下标越界时忽略。 */
+	public void updateWidget(int index, NokiaWidgetItem item) {
+		List<NokiaWidgetItem> list = getWidgets();
+		if (index < 0 || index >= list.size()) {
+			NokiaLog.w("WidgetStorage", "updateWidget: 下标越界 index=" + index + " size=" + list.size());
+			return;
+		}
+		list.set(index, item);
+		setWidgets(list);
+		NokiaLog.i("WidgetStorage", "updateWidget: 更新下标 " + index + " -> " + item.label);
+	}
+
 	/** 追加一个组件；已达上限时拒绝并返回 false。 */
 	public boolean addWidget(NokiaWidgetItem item) {
 		List<NokiaWidgetItem> list = getWidgets();

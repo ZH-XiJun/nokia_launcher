@@ -250,9 +250,16 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 		if (focusIndex < 0 || focusIndex >= widgets.size()) return;
 		NokiaWidgetItem item = widgets.get(focusIndex);
 		if (item.isEditable()) {
-			// 应用/网址/Activity 的编辑页在后续文档定义，暂未实现
-			NokiaLog.i(TAG, "确认键：可编辑组件，编辑页待实现 label=" + item.label);
-			showToast("该类型编辑功能待实现");
+			if (item.type == NokiaWidgetItem.TYPE_APP) {
+				// 应用类组件：进入应用选择页（编辑模式），换绑应用
+				NokiaLog.i(TAG, "确认键：应用类组件进入编辑（换绑） label=" + item.label);
+				((NokiaDesktopActivity) requireActivity())
+						.openFragment(NokiaWidgetAppPickerFragment.newEditMode(focusIndex));
+			} else {
+				// 网址/Activity 的编辑页在后续文档定义，暂未实现
+				NokiaLog.i(TAG, "确认键：可编辑组件，编辑页待实现 label=" + item.label);
+				showToast("该类型编辑功能待实现");
+			}
 		} else {
 			NokiaLog.i(TAG, "确认键：该组件不可编辑 label=" + item.label);
 			showToast("该组件不可编辑");

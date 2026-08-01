@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 桌面组件设置 → 添加组件 → 应用选择页（NokiaWidgetAppPickerFragment）。
+     顶部标题 + 搜索框 + 宫格容器，宫格由代码动态构建。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="240dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@android:color/transparent">
+
+    <!-- 标题行：左标题，右页码 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvAppPickerTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="4dp"
+            android:text="选择应用"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvAppPage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:layout_marginTop="4dp"
+            android:text="1/1"
+            android:textColor="#AAAAAA"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- 搜索框 -->
+    <EditText
+        android:id="@+id/etAppSearch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/bg_nokia_searchbox"
+        android:focusable="false"
+        android:hint="输入应用名搜索..."
+        android:imeOptions="actionDone"
+        android:inputType="text"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:singleLine="true"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#88FFFFFF"
+        android:textSize="11sp" />
+
+    <!-- 匹配结果计数：无搜索词时隐藏（保留占位） -->
+    <TextView
+        android:id="@+id/tvAppMatchCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="1dp"
+        android:visibility="invisible"
+        android:text=""
+        android:textColor="#AAAAAA"
+        android:textSize="10sp" />
+
+    <!-- 宫格容器：行由代码动态填充 -->
+    <LinearLayout
+        android:id="@+id/appGrid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="6dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="6dp" />
+
+    <!-- 空状态/无匹配提示：动态显示 -->
+    <TextView
+        android:id="@+id/tvAppEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:gravity="center"
+        android:paddingTop="20dp"
+        android:text=""
+        android:textColor="#AAAAAA"
+        android:textSize="12sp" />
+</LinearLayout>

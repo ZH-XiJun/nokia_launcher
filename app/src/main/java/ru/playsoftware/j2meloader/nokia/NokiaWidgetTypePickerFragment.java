@@ -265,6 +265,10 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage
 		NokiaLog.i(TAG, "选择类型: " + NokiaWidgetItem.getTypeName(type));
 		switch (type) {
 			case NokiaWidgetItem.TYPE_APP:
+				// 应用选择页（添加模式），见 docs/2-应用类组件添加界面设计.md
+				((NokiaDesktopActivity) requireActivity())
+						.openFragment(NokiaWidgetAppPickerFragment.newAddMode());
+				break;
 			case NokiaWidgetItem.TYPE_URL:
 			case NokiaWidgetItem.TYPE_ACTIVITY:
 				// 各编辑页由后续文档定义，暂未实现

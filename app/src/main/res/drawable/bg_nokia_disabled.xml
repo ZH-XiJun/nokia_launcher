@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用选择页：已添加应用格子背景（浅灰底） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#2A666666" />
+    <corners android:radius="4dp" />
+</shape>
