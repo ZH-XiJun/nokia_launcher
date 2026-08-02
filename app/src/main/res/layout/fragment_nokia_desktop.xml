@@ -65,7 +65,7 @@
         android:layout_marginStart="6dp"
         android:layout_marginEnd="6dp" />
 
-    <!-- 通知区：填充快捷栏下方剩余空间，允许被挤压 -->
+    <!-- 桌面组件区：填充快捷栏下方剩余空间，动态渲染用户添加的组件 -->
     <LinearLayout
         android:id="@+id/notificationArea"
         android:layout_width="match_parent"
@@ -75,108 +75,8 @@
         android:paddingStart="8dp"
         android:paddingTop="2dp"
         android:paddingEnd="8dp"
-        android:paddingBottom="4dp">
+        android:paddingBottom="4dp" />
 
-        <LinearLayout
-            android:id="@+id/notifMusic"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:focusable="true"
-            android:clickable="true"
-            android:gravity="center_vertical"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp">
-            <TextView
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:layout_marginEnd="6dp"
-                android:gravity="center"
-                android:text="♪"
-                android:textColor="#f44336"
-                android:textSize="14sp" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="音乐播放器"
-                android:textColor="#FFFFFF"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/notifRadio"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:focusable="true"
-            android:clickable="true"
-            android:gravity="center_vertical"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp">
-            <ImageView
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:layout_marginEnd="6dp"
-                app:srcCompat="@drawable/ic_nokia_web" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="3g.qq.com"
-                android:textColor="#FFFFFF"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/notifLock"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:focusable="true"
-            android:clickable="true"
-            android:gravity="center_vertical"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp">
-            <ImageView
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:layout_marginEnd="6dp"
-                app:srcCompat="@drawable/ic_nokia_lock" />
-            <TextView
-                android:id="@+id/notifLockText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="锁屏"
-                android:textColor="#FFFFFF"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/notifCalendar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:focusable="true"
-            android:clickable="true"
-            android:gravity="center_vertical"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp">
-            <ImageView
-                android:layout_width="14dp"
-                android:layout_height="12dp"
-                android:layout_marginEnd="6dp"
-                app:srcCompat="@drawable/ic_nokia_cal_small" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="星期一 2026-07-27"
-                android:textColor="#FFFFFF"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:paddingStart="22dp"
-            android:text="无更多备忘"
-            android:textColor="#888888"
-            android:textSize="10sp" />
-    </LinearLayout>
 
     <ImageView
         android:layout_width="80dp"

@@ -1,12 +1,16 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.StatFs;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -23,37 +27,41 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.config.Config;
 
 /**
  * 桌面待机屏中间内容碎片。
- * 支持方向键在快捷应用栏（动态数量）、通知区（3 项）和功能表按钮之间导航。
- * 快捷栏应用由用户在桌面设置中配置，动态加载并支持左右滚动。
+ * 支持方向键在快捷应用栏（动态数量）和桌面组件区之间导航。
+ * 桌面组件由用户在桌面设置中配置，动态加载自 NokiaWidgetStorage。
  */
 public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 	private final List<View> focusTargets = new ArrayList<>();
 	private final List<ShortcutApp> shortcutApps = new ArrayList<>();
+	private final List<NokiaWidgetItem> widgetItems = new ArrayList<>();
 	private int focusIndex = -1;
 	private View selectedView = null;
 	private NokiaSettingsStorage settingsStorage;
-	/** 选中快捷应用图标上方浮出的名称气泡（半透明，短暂显示后自动消失） */
+	private NokiaWidgetStorage widgetStorage;
+	/** 选中快捷应用图标上方浮出的名称气泡 */
 	private TextView shortcutNameBubble;
-	/** 横向滚动的快捷栏（用于计算气泡水平位置） */
 	private HorizontalScrollView shortcutBar;
-	/** 气泡自动隐藏的定时器 */
 	private Handler bubbleHandler;
-	/** 气泡显示的持续时间（毫秒） */
 	private static final long BUBBLE_DURATION = 2000;
 
 	/** 快捷栏项数（动态） */
 	private int shortcutCount = 0;
-	/** 通知区项数（音乐、3g.qq.com、锁屏、日历） */
-	private static final int NOTIF_COUNT = 4;
+	/** 组件区项数（动态，由 widgetItems.size() 决定） */
+	private int widgetCount = 0;
+
 	/** 快捷栏第一个焦点索引 */
 	private static final int SHORTCUT_FIRST = 0;
 
@@ -70,12 +78,11 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.scaleMidContent(view, true);
 
-		// 名称气泡与快捷栏引用
 		shortcutBar = view.findViewById(R.id.shortcutBar);
 		shortcutNameBubble = view.findViewById(R.id.shortcutNameBubble);
 		bubbleHandler = new Handler(Looper.getMainLooper());
 
-		// 上下两条点线分割线（自定义 Drawable，保证在各类 ROM 上都能渲染）
+		// 点线分割线
 		View dividerTop = view.findViewById(R.id.shortcutDividerTop);
 		View dividerBottom = view.findViewById(R.id.shortcutDivider);
 		if (dividerTop != null) {
@@ -86,37 +93,25 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		}
 
 		settingsStorage = new NokiaSettingsStorage(requireContext());
+		widgetStorage = new NokiaWidgetStorage(requireContext());
 
 		View wall = host.findViewById(R.id.wallpaper);
 		if (wall != null) {
 			wall.setBackgroundResource(R.drawable.bg_nokia_desktop);
 		}
-		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配（左右触摸由 Activity bindBottomBarTouch 统一处理）
 		host.refreshPageBar();
 
-		// 清空上一轮的焦点状态，避免旧 View 遗留导致导航错乱或崩溃
 		focusTargets.clear();
 		shortcutApps.clear();
+		widgetItems.clear();
 		focusIndex = -1;
 		selectedView = null;
 
-		// 加载快捷栏应用（已配置同步/首次异步，均不阻塞主线程），完成后重建快捷栏与焦点（含通知区）
 		loadShortcutBarAsync(view);
-
-		// 通知区点击行为：3g.qq.com → 浏览器打开网页；锁屏 → 一键锁屏
-		View notifRadio = view.findViewById(R.id.notifRadio);
-		if (notifRadio != null) {
-			notifRadio.setOnClickListener(v -> openUrl("http://wkypub.top:9999"));
-		}
-		View notifLock = view.findViewById(R.id.notifLock);
-		if (notifLock != null) {
-			notifLock.setOnClickListener(v -> lockScreen());
-		}
-		// 锁屏文案：显示「锁屏：按xxx键」，xxx 为桌面设置里绑定的锁屏键，方便用户记忆
-		refreshLockScreenHint(host);
+		rebuildWidgetArea(view);
 
 		NokiaLog.i("Desktop", "桌面待机屏初始化完成：快捷栏 " + shortcutCount
-				+ " 项，通知区 " + NOTIF_COUNT + " 项，共 " + focusTargets.size() + " 个焦点");
+				+ " 项，组件区 " + widgetCount + " 项");
 	}
 
 	@Override
@@ -124,47 +119,37 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		super.onResume();
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.refreshPageBar();
-		// 从桌面设置改完键返回后，刷新锁屏按钮的键名提示
-		refreshLockScreenHint(host);
-		NokiaLog.d("Desktop", "桌面 onResume 同步底部栏");
+		// 从桌面设置返回后刷新组件区（可能有增删改）
+		View view = getView();
+		if (view != null) {
+			rebuildWidgetArea(view);
+		}
+		NokiaLog.d("Desktop", "桌面 onResume，已刷新组件区");
 	}
 
 	// ---- 构建快捷栏 ----
 
-	/**
-	 * 冷启动快速渲染入口：先读磁盘图标缓存（毫秒级），再异步获取快捷栏配置并重建视图。
-	 * 首帧主线程路径不执行任何 PackageManager 查询。
-	 */
 	private void loadShortcutBarAsync(View view) {
-		// 冷启动：优先读磁盘缓存（毫秒级，无 PackageManager 查询），保证 getIcon 立即可用
 		long loadStart = System.currentTimeMillis();
 		NokiaS60IconMap.loadFromDisk(requireContext());
 		long loadElapsed = System.currentTimeMillis() - loadStart;
 		NokiaLog.i("Desktop", "S60 图标磁盘缓存加载耗时 " + loadElapsed + "ms");
 
-		// 已配置时同步回调（毫秒级）；首次未配置时后台构建默认快捷应用后回调（均回主线程）
 		settingsStorage.getShortcutAppsAsync(new NokiaSettingsStorage.OnShortcutAppsLoaded() {
 			@Override
 			public void onLoaded(List<ShortcutApp> apps) {
 				if (!isAdded() || getView() == null) return;
-				NokiaLog.i("Desktop", "快捷栏配置就绪：" + apps.size() + " 项，开始重建快捷栏");
+				NokiaLog.i("Desktop", "快捷栏配置就绪：" + apps.size() + " 项");
 				rebuildShortcutBar(apps);
 			}
 		});
 	}
 
-	/**
-	 * 重建快捷栏视图与焦点目标（快捷项在前、通知区在后），并异步刷新 S60 图标。
-	 * 主线程路径无 PackageManager 查询。
-	 */
 	private void rebuildShortcutBar(List<ShortcutApp> apps) {
 		View view = getView();
 		if (view == null) return;
 		LinearLayout container = view.findViewById(R.id.shortcutContainer);
-		if (container == null) {
-			NokiaLog.w("Desktop", "shortcutContainer 未找到");
-			return;
-		}
+		if (container == null) return;
 
 		long buildStart = System.currentTimeMillis();
 		container.removeAllViews();
@@ -175,11 +160,9 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		focusIndex = -1;
 		selectedView = null;
 
-		// 焦点目标整体重建：快捷项在前，通知区在后
 		focusTargets.clear();
 
 		if (apps.isEmpty()) {
-			// 空状态：显示提示文字
 			TextView hint = new TextView(requireContext());
 			hint.setLayoutParams(new LinearLayout.LayoutParams(
 					LinearLayout.LayoutParams.WRAP_CONTENT, NokiaDimens.dp(getResources(), 34)));
@@ -188,11 +171,9 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			hint.setTextColor(0xFF888888);
 			hint.setTextSize(10);
 			container.addView(hint);
-			NokiaLog.i("Desktop", "快捷栏为空");
 		} else {
 			for (int i = 0; i < apps.size(); i++) {
-				ShortcutApp app = apps.get(i);
-				LinearLayout cell = createShortcutCell(app, i);
+				LinearLayout cell = createShortcutCell(apps.get(i), i);
 				if (cell != null) {
 					container.addView(cell);
 					focusTargets.add(cell);
@@ -200,27 +181,372 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			}
 		}
 
-		// 收集通知区焦点目标（排在快捷项之后，保证导航顺序：快捷栏 → 通知区）
-		collectNotifTargets(view);
+		// 收集组件区焦点（排在快捷项之后）
+		collectWidgetTargets(view);
 
 		long buildElapsed = System.currentTimeMillis() - buildStart;
 		NokiaLog.i("Desktop", "快捷栏已构建：" + apps.size() + " 项，共 " + focusTargets.size()
 				+ " 个焦点，耗时 " + buildElapsed + "ms");
 
-		// 初始选中第一个焦点（延迟到布局完成，确保气泡定位坐标准确）
 		view.post(() -> {
 			if (focusTargets.size() > 0) {
 				setFocusIndex(0);
 			}
 		});
 
-		// 后台异步扫描 S60 图标缓存（包集合未变不重扫），完成后仅刷新图标，不重建视图/焦点
 		NokiaS60IconMap.initAsync(requireContext(), () -> {
 			if (!isAdded() || getView() == null) return;
-			NokiaLog.i("Desktop", "S60 图标缓存就绪，刷新快捷栏图标");
 			refreshShortcutIcons(container);
 		});
 	}
+
+	// ---- 组件区动态渲染 ----
+
+	/** 重建桌面组件区：从 NokiaWidgetStorage 读取所有组件，动态创建行 View。 */
+	private void rebuildWidgetArea(View view) {
+		LinearLayout notifArea = view.findViewById(R.id.notificationArea);
+		if (notifArea == null) return;
+
+		// 先清空旧 View（但保留其他非焦点子 View，如果有的话）
+		notifArea.removeAllViews();
+		widgetItems.clear();
+		widgetItems.addAll(widgetStorage.getWidgets());
+		widgetCount = widgetItems.size();
+
+		if (widgetItems.isEmpty()) {
+			// 无组件时显示提示
+			TextView hint = new TextView(requireContext());
+			hint.setLayoutParams(new LinearLayout.LayoutParams(
+					LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+			hint.setPadding(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 4),
+					0, 0);
+			hint.setText("无更多备忘");
+			hint.setTextColor(0xFF888888);
+			hint.setTextSize(10);
+			notifArea.addView(hint);
+			NokiaLog.i("Desktop", "组件区为空");
+		} else {
+			for (int i = 0; i < widgetItems.size(); i++) {
+				View row = createWidgetRow(widgetItems.get(i));
+				if (row != null) {
+					notifArea.addView(row);
+				}
+			}
+			NokiaLog.i("Desktop", "组件区已渲染 " + widgetItems.size() + " 个组件");
+		}
+
+		// 重建焦点列表（保留快捷栏部分，重建组件区部分）
+		// 先清掉旧的组件区焦点
+		int shortcutFocusCount = Math.min(focusTargets.size(), shortcutCount);
+		while (focusTargets.size() > shortcutFocusCount) {
+			focusTargets.remove(focusTargets.size() - 1);
+		}
+		// 重新收集
+		collectWidgetTargets(view);
+
+		// 如果当前焦点索引超出范围，复位
+		if (focusIndex >= focusTargets.size()) {
+			setFocusIndex(Math.max(0, focusTargets.size() - 1));
+		}
+	}
+
+	/** 创建单个组件行 View。内存/存储带进度条，其余类型仅文字。 */
+	private View createWidgetRow(NokiaWidgetItem item) {
+		switch (item.type) {
+			case NokiaWidgetItem.TYPE_MEMORY:
+				return createWidgetRowWithProgress(item, 0xFF4FC3F7, getMemoryUsedRatio(), getMemoryPercentText());
+			case NokiaWidgetItem.TYPE_STORAGE:
+				return createWidgetRowWithProgress(item, 0xFF81C784, getStorageUsedRatio(), getStoragePercentText());
+			default:
+				return createWidgetRowSimple(item);
+		}
+	}
+
+	/** 创建带进度条的组件行（内存/存储）。 */
+	private View createWidgetRowWithProgress(NokiaWidgetItem item, int fillColor, float usedRatio, String percentText) {
+		Context ctx = requireContext();
+		LinearLayout row = new LinearLayout(ctx);
+		row.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		row.setOrientation(LinearLayout.HORIZONTAL);
+		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.setPadding(NokiaDimens.dp(getResources(), 2), NokiaDimens.dp(getResources(), 3),
+				NokiaDimens.dp(getResources(), 2), NokiaDimens.dp(getResources(), 3));
+		row.setFocusable(true);
+		row.setClickable(true);
+
+		// 图标 14dp
+		int iconRes = NokiaWidgetItem.getTypeIcon(item.type);
+		ImageView iv = new ImageView(ctx);
+		iv.setLayoutParams(new LinearLayout.LayoutParams(
+				NokiaDimens.dp(getResources(), 14), NokiaDimens.dp(getResources(), 14)));
+		iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+		try { iv.setImageResource(iconRes); } catch (Exception ignored) {}
+		iv.setPadding(0, 0, NokiaDimens.dp(getResources(), 5), 0);
+		row.addView(iv);
+
+		// 标签文字，弹性占满剩余空间
+		TextView labelTv = new TextView(ctx);
+		LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(
+				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+		labelTv.setLayoutParams(labelLp);
+		labelTv.setText(item.label);
+		labelTv.setTextColor(0xFFFFFFFF);
+		labelTv.setTextSize(11);
+		labelTv.setSingleLine(true);
+		row.addView(labelTv);
+
+		// 进度条背景轨 50dp × 4dp，圆角 2dp
+		int barW = NokiaDimens.dp(getResources(), 50);
+		int barH = NokiaDimens.dp(getResources(), 4);
+		LinearLayout barTrack = new LinearLayout(ctx);
+		LinearLayout.LayoutParams trackLp = new LinearLayout.LayoutParams(barW, barH);
+		trackLp.gravity = Gravity.CENTER_VERTICAL;
+		barTrack.setLayoutParams(trackLp);
+		barTrack.setOrientation(LinearLayout.HORIZONTAL);
+		// 背景轨：半透明白色 #26FFFFFF，圆角 2dp
+		android.graphics.drawable.GradientDrawable trackBg = new android.graphics.drawable.GradientDrawable();
+		trackBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+		trackBg.setCornerRadius(NokiaDimens.dp(getResources(), 2));
+		trackBg.setColor(0x26FFFFFF);
+		barTrack.setBackground(trackBg);
+		barTrack.setPadding(0, 0, 0, 0);
+
+		// 进度条填充（子 View，动态宽度 = usedRatio * 50dp）
+		View barFill = new View(ctx);
+		int fillW = Math.max(0, (int) (usedRatio * barW));
+		barFill.setLayoutParams(new LinearLayout.LayoutParams(fillW, barH));
+		android.graphics.drawable.GradientDrawable fillBg = new android.graphics.drawable.GradientDrawable();
+		fillBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+		fillBg.setCornerRadius(NokiaDimens.dp(getResources(), 2));
+		fillBg.setColor(fillColor);
+		barFill.setBackground(fillBg);
+		barTrack.addView(barFill);
+		row.addView(barTrack);
+
+		// 百分比文字 9sp，进度条右侧 3dp
+		TextView percentTv = new TextView(ctx);
+		LinearLayout.LayoutParams pctLp = new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+		pctLp.setMargins(NokiaDimens.dp(getResources(), 3), 0, 0, 0);
+		percentTv.setLayoutParams(pctLp);
+		percentTv.setText(percentText);
+		percentTv.setTextColor(0x80FFFFFF);
+		percentTv.setTextSize(9);
+		percentTv.setSingleLine(true);
+		row.addView(percentTv);
+
+		setupWidgetRowClick(row, item);
+		return row;
+	}
+
+	/** 创建无进度条的普通组件行（日历/使用时长/可编辑类型）。 */
+	private View createWidgetRowSimple(NokiaWidgetItem item) {
+		Context ctx = requireContext();
+		LinearLayout row = new LinearLayout(ctx);
+		row.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		row.setOrientation(LinearLayout.HORIZONTAL);
+		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.setPadding(NokiaDimens.dp(getResources(), 2), NokiaDimens.dp(getResources(), 3),
+				NokiaDimens.dp(getResources(), 2), NokiaDimens.dp(getResources(), 3));
+		row.setFocusable(true);
+		row.setClickable(true);
+
+		// 图标
+		int iconRes = NokiaWidgetItem.getTypeIcon(item.type);
+		ImageView iv = new ImageView(ctx);
+		iv.setLayoutParams(new LinearLayout.LayoutParams(
+				NokiaDimens.dp(getResources(), 16), NokiaDimens.dp(getResources(), 16)));
+		iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+		try { iv.setImageResource(iconRes); } catch (Exception ignored) {}
+		iv.setPadding(0, 0, NokiaDimens.dp(getResources(), 6), 0);
+		row.addView(iv);
+
+		// 标签文字
+		TextView labelTv = new TextView(ctx);
+		labelTv.setLayoutParams(new LinearLayout.LayoutParams(
+				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+		labelTv.setText(item.label);
+		labelTv.setTextColor(0xFFFFFFFF);
+		labelTv.setTextSize(11);
+		labelTv.setSingleLine(true);
+		row.addView(labelTv);
+
+		// 右侧信息文字
+		TextView infoTv = new TextView(ctx);
+		infoTv.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		infoTv.setTextColor(0xFFAAAAAA);
+		infoTv.setTextSize(10);
+		infoTv.setGravity(Gravity.END);
+		infoTv.setSingleLine(true);
+		infoTv.setText(getWidgetInfoText(item));
+		row.addView(infoTv);
+
+		setupWidgetRowClick(row, item);
+		return row;
+	}
+
+	/** 获取组件右侧展示信息（无进度条类型）。 */
+	private String getWidgetInfoText(NokiaWidgetItem item) {
+		switch (item.type) {
+			case NokiaWidgetItem.TYPE_CALENDAR:
+				return getCalendarText();
+			case NokiaWidgetItem.TYPE_USAGE:
+				return getUsageText();
+			default:
+				return item.getTypeTag();
+		}
+	}
+
+	// ---- 进度条数据 ----
+
+	/** 返回已用比例 [0,1] 和百分比文字。 */
+	private float getMemoryUsedRatio() {
+		try {
+			ActivityManager am = (ActivityManager) requireContext()
+					.getSystemService(Context.ACTIVITY_SERVICE);
+			if (am == null) return 0;
+			ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+			am.getMemoryInfo(mi);
+			long total = mi.totalMem;
+			long avail = mi.availMem;
+			if (total <= 0) return 0;
+			return (float) (total - avail) / total;
+		} catch (Exception e) {
+			return 0;
+		}
+	}
+
+	private String getMemoryPercentText() {
+		try {
+			ActivityManager am = (ActivityManager) requireContext()
+					.getSystemService(Context.ACTIVITY_SERVICE);
+			if (am == null) return "";
+			ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+			am.getMemoryInfo(mi);
+			long total = mi.totalMem;
+			long avail = mi.availMem;
+			if (total <= 0) return "";
+			int pct = (int) ((total - avail) * 100 / total);
+			return pct + "%";
+		} catch (Exception e) {
+			return "";
+		}
+	}
+
+	private float getStorageUsedRatio() {
+		try {
+			File dataDir = Environment.getDataDirectory();
+			StatFs stat = new StatFs(dataDir.getPath());
+			long total, avail;
+			if (Build.VERSION.SDK_INT >= 18) {
+				total = stat.getBlockCountLong() * stat.getBlockSizeLong();
+				avail = stat.getAvailableBlocksLong() * stat.getBlockSizeLong();
+			} else {
+				total = (long) stat.getBlockCount() * stat.getBlockSize();
+				avail = (long) stat.getAvailableBlocks() * stat.getBlockSize();
+			}
+			if (total <= 0) return 0;
+			return (float) (total - avail) / total;
+		} catch (Exception e) {
+			return 0;
+		}
+	}
+
+	private String getStoragePercentText() {
+		try {
+			File dataDir = Environment.getDataDirectory();
+			StatFs stat = new StatFs(dataDir.getPath());
+			long total, avail;
+			if (Build.VERSION.SDK_INT >= 18) {
+				total = stat.getBlockCountLong() * stat.getBlockSizeLong();
+				avail = stat.getAvailableBlocksLong() * stat.getBlockSizeLong();
+			} else {
+				total = (long) stat.getBlockCount() * stat.getBlockSize();
+				avail = (long) stat.getAvailableBlocks() * stat.getBlockSize();
+			}
+			if (total <= 0) return "";
+			int pct = (int) ((total - avail) * 100 / total);
+			return pct + "%";
+		} catch (Exception e) {
+			return "";
+		}
+	}
+
+	// ---- 不可编辑类型实时数据 ----
+
+	private String getCalendarText() {
+		try {
+			Calendar cal = Calendar.getInstance();
+			String[] weekDays = {"星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"};
+			int dow = cal.get(Calendar.DAY_OF_WEEK) - 1; // 0=Sunday
+			String weekDay = weekDays[dow];
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+			return weekDay + " " + sdf.format(cal.getTime());
+		} catch (Exception e) {
+			return "日历";
+		}
+	}
+
+	private String getUsageText() {
+		try {
+			long uptime = android.os.SystemClock.elapsedRealtime() / 1000;
+			long hours = uptime / 3600;
+			long minutes = (uptime % 3600) / 60;
+			if (hours > 0) {
+				return hours + "小时" + minutes + "分";
+			}
+			return minutes + "分钟";
+		} catch (Exception e) {
+			return "使用时长";
+		}
+	}
+
+	/** 设置组件行的点击行为。 */
+	private void setupWidgetRowClick(LinearLayout row, NokiaWidgetItem item) {
+		switch (item.type) {
+			case NokiaWidgetItem.TYPE_URL:
+				row.setOnClickListener(v -> {
+					String url = item.value;
+					if (url != null && !url.isEmpty()) {
+						NokiaLog.i("Desktop", "打开网址组件: " + url);
+						try {
+							Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+							intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+							startActivity(intent);
+						} catch (Exception e) {
+							NokiaLog.e("Desktop", "打开网址失败: " + url, e);
+						}
+					}
+				});
+				break;
+			case NokiaWidgetItem.TYPE_APP:
+			case NokiaWidgetItem.TYPE_ACTIVITY:
+				row.setOnClickListener(v -> {
+					String pkgAndCls = item.value;
+					if (pkgAndCls != null && pkgAndCls.contains("/")) {
+						String[] parts = pkgAndCls.split("/", 2);
+						NokiaLog.i("Desktop", "打开应用组件: " + pkgAndCls);
+						try {
+							Intent intent = new Intent(Intent.ACTION_MAIN);
+							intent.setClassName(parts[0], parts[1]);
+							intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+							startActivity(intent);
+						} catch (Exception e) {
+							NokiaLog.e("Desktop", "打开应用失败: " + pkgAndCls, e);
+						}
+					}
+				});
+				break;
+			default:
+				// 不可编辑类型无点击行为
+				break;
+		}
+	}
+
+	// ---- 快捷栏 ----
 
 	private LinearLayout createShortcutCell(ShortcutApp app, int index) {
 		Context ctx = requireContext();
@@ -230,12 +556,10 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		cell.setGravity(Gravity.CENTER);
 		cell.setPadding(NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4));
 		cell.setClickable(true);
-
 		cell.setTag(app);
 
 		ImageView iv = new ImageView(ctx);
 		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
-		// 首帧仅加载内存图标（S60 缓存 / 关键词匹配，无 IPC）；真实图标由后台异步刷新
 		Drawable icon = loadShortcutIconMemory(app);
 		if (icon != null) {
 			iv.setImageDrawable(icon);
@@ -250,28 +574,18 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		return cell;
 	}
 
-	/**
-	 * 主线程轻量图标加载（首帧使用）：仅读内存 S60 图标缓存，无 PackageManager 查询、
-	 * 无文件 IO。未命中返回 null（调用方用占位图标，后台异步刷新真实图标）。
-	 */
 	private Drawable loadShortcutIconMemory(ShortcutApp app) {
 		try {
 			if (app.type == ShortcutApp.TYPE_ANDROID) {
 				Intent intent = app.getLaunchIntent();
 				if (intent != null && intent.getComponent() != null) {
 					String pkg = intent.getComponent().getPackageName();
-					// 优先使用 S60 风格图标，与功能表保持一致（读内存缓存，毫秒级）
 					int s60Res = NokiaS60IconMap.getIcon(pkg);
 					if (s60Res != 0) {
 						try {
 							Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
-							if (s60Icon != null) {
-								NokiaLog.d("Desktop", "快捷栏应用 " + app.label + " 使用 S60 图标(内存)");
-								return s60Icon;
-							}
-						} catch (Exception e) {
-							NokiaLog.w("Desktop", "加载 S60 图标失败: " + app.label);
-						}
+							if (s60Icon != null) return s60Icon;
+						} catch (Exception ignored) {}
 					}
 				}
 			}
@@ -281,14 +595,9 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		return null;
 	}
 
-	/**
-	 * 完整图标加载（可在后台线程执行）：J2ME 文件图标 → S60 图标 → 应用真实图标。
-	 * 含文件 IO 与 getActivityIcon IPC，冷启动首帧禁止在主线程调用。
-	 */
 	private Drawable loadShortcutIconNow(ShortcutApp app) {
 		try {
 			if (app.type == ShortcutApp.TYPE_J2ME && app.iconPath != null) {
-				// J2ME 图标从本地文件加载
 				Drawable d = Drawable.createFromPath(app.iconPath);
 				if (d != null) return d;
 			}
@@ -296,28 +605,17 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 				Intent intent = app.getLaunchIntent();
 				if (intent != null && intent.getComponent() != null) {
 					String pkg = intent.getComponent().getPackageName();
-
-					// 优先使用 S60 风格图标，与功能表保持一致
 					int s60Res = NokiaS60IconMap.getIcon(pkg);
 					if (s60Res != 0) {
 						try {
 							Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
-							if (s60Icon != null) {
-								NokiaLog.d("Desktop", "快捷栏应用 " + app.label + " 使用 S60 图标");
-								return s60Icon;
-							}
-						} catch (Exception e) {
-							NokiaLog.w("Desktop", "加载 S60 图标失败: " + app.label);
-						}
+							if (s60Icon != null) return s60Icon;
+						} catch (Exception ignored) {}
 					}
-
-					// 兜底：使用应用真实图标（getActivityIcon 为 IPC，后台线程调用）
 					try {
 						return requireActivity().getPackageManager()
 								.getActivityIcon(intent.getComponent());
-					} catch (Exception e) {
-						NokiaLog.w("Desktop", "加载应用图标失败: " + app.label);
-					}
+					} catch (Exception ignored) {}
 				}
 			}
 		} catch (Exception e) {
@@ -326,109 +624,57 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		return null;
 	}
 
-	/**
-	 * 后台异步刷新快捷栏各单元的图标（S60 扫描 / 首次默认构建完成后调用）。
-	 * 图标加载在后台线程执行，回主线程逐项 setImageDrawable；不重建 View，不影响焦点索引。
-	 */
 	private void refreshShortcutIcons(final LinearLayout container) {
 		if (container == null || shortcutApps.isEmpty()) return;
 		final Handler mainHandler = new Handler(Looper.getMainLooper());
 		for (int i = 0; i < shortcutApps.size(); i++) {
 			final ShortcutApp app = shortcutApps.get(i);
 			final int index = i;
-			new Thread(new Runnable() {
-				@Override
-				public void run() {
-					final Drawable icon = loadShortcutIconNow(app);
-					mainHandler.post(new Runnable() {
-						@Override
-						public void run() {
-							if (!isAdded() || getView() == null) return;
-							if (index >= container.getChildCount()) return;
-							View child = container.getChildAt(index);
-							if (!(child instanceof LinearLayout)) return;
-							View iconView = ((LinearLayout) child).getChildAt(0);
-							if (iconView instanceof ImageView && icon != null) {
-								((ImageView) iconView).setImageDrawable(icon);
-							}
-						}
-					});
-				}
+			new Thread(() -> {
+				final Drawable icon = loadShortcutIconNow(app);
+				mainHandler.post(() -> {
+					if (!isAdded() || getView() == null) return;
+					if (index >= container.getChildCount()) return;
+					View child = container.getChildAt(index);
+					if (!(child instanceof LinearLayout)) return;
+					View iconView = ((LinearLayout) child).getChildAt(0);
+					if (iconView instanceof ImageView && icon != null) {
+						((ImageView) iconView).setImageDrawable(icon);
+					}
+				});
 			}, "shortcut-icon-" + index).start();
 		}
-		NokiaLog.i("Desktop", "后台刷新快捷栏图标完成（" + shortcutApps.size() + " 项）");
 	}
 
 	private void launchShortcutApp(ShortcutApp app) {
-		NokiaLog.i("Desktop", "启动快捷栏应用: " + app.label + " type=" + app.type);
+		NokiaLog.i("Desktop", "启动快捷栏应用: " + app.label);
 		try {
 			if (app.type == ShortcutApp.TYPE_ANDROID) {
 				Intent intent = app.getLaunchIntent();
-				if (intent != null) {
-					startActivity(intent);
-					return;
-				}
+				if (intent != null) { startActivity(intent); return; }
 			}
 			if (app.type == ShortcutApp.TYPE_J2ME) {
 				Config.startApp(requireActivity(), app.label, app.appKey, false);
-				return;
 			}
 		} catch (Exception e) {
 			NokiaLog.e("Desktop", "启动快捷栏应用失败: " + app.label, e);
 		}
 	}
 
-	// ---- 通知区点击行为 ----
+	// ---- 焦点收集 ----
 
-	/** 用浏览器打开指定网址（交由系统选择器挑选浏览器）。 */
-	private void openUrl(String url) {
-		NokiaLog.i("Desktop", "打开网页: " + url);
-		try {
-			Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			startActivity(intent);
-		} catch (Exception e) {
-			NokiaLog.e("Desktop", "打开网页失败: " + url, e);
+	private void collectWidgetTargets(View view) {
+		LinearLayout notifArea = view.findViewById(R.id.notificationArea);
+		if (notifArea == null) return;
+		for (int i = 0; i < notifArea.getChildCount(); i++) {
+			View child = notifArea.getChildAt(i);
+			if (child.isFocusable()) {
+				focusTargets.add(child);
+			}
 		}
 	}
 
-	/** 一键锁屏。需要设备管理员权限；未授权时跳转系统激活页。 */
-	private void lockScreen() {
-		NokiaLockScreen.lock(requireContext());
-	}
-
-	// ---- 收集通知区焦点 ----
-
-
-	private void collectNotifTargets(View view) {
-		View notifMusic = view.findViewById(R.id.notifMusic);
-		View notifRadio = view.findViewById(R.id.notifRadio);
-		View notifLock = view.findViewById(R.id.notifLock);
-		View notifCalendar = view.findViewById(R.id.notifCalendar);
-
-		if (notifMusic != null) focusTargets.add(notifMusic);
-		if (notifRadio != null) focusTargets.add(notifRadio);
-		if (notifLock != null) focusTargets.add(notifLock);
-		if (notifCalendar != null) focusTargets.add(notifCalendar);
-	}
-
-	/** 刷新通知区「锁屏」按钮文案：显示已绑定的锁屏键名（如「按*号键锁屏」）。 */
-	private void refreshLockScreenHint(NokiaDesktopActivity host) {
-		TextView tv = getView() != null ? getView().findViewById(R.id.notifLockText) : null;
-		if (tv == null) return;
-		NokiaKeyBinding kb = host.getKeyBinding();
-		if (kb == null) return;
-		int lockKey = kb.getKeyCode(NokiaKeyBinding.ACTION_LOCK_SCREEN);
-		if (NokiaKeyBinding.isBound(lockKey)) {
-			String tip = "按" + NokiaLog.keyName(lockKey) + "键锁屏";
-			tv.setText(tip);
-			NokiaLog.i("Desktop", "锁屏按钮文案=" + tip);
-		} else {
-			tv.setText("锁屏");
-		}
-	}
-
-	// ---- NokiaFocusHost 接口 ----
+	// ---- NokiaFocusHost ----
 
 	@Override
 	public boolean onDirection(int direction) {
@@ -437,18 +683,12 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			setFocusIndex(0);
 			return true;
 		}
-
 		switch (direction) {
-			case NokiaKeyBinding.ACTION_UP:
-				return moveUp();
-			case NokiaKeyBinding.ACTION_DOWN:
-				return moveDown();
-			case NokiaKeyBinding.ACTION_LEFT:
-				return moveLeft();
-			case NokiaKeyBinding.ACTION_RIGHT:
-				return moveRight();
-			default:
-				return false;
+			case NokiaKeyBinding.ACTION_UP: return moveUp();
+			case NokiaKeyBinding.ACTION_DOWN: return moveDown();
+			case NokiaKeyBinding.ACTION_LEFT: return moveLeft();
+			case NokiaKeyBinding.ACTION_RIGHT: return moveRight();
+			default: return false;
 		}
 	}
 
@@ -456,81 +696,55 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	public boolean onSelect() {
 		if (focusIndex < 0 || focusIndex >= focusTargets.size()) return false;
 		View v = focusTargets.get(focusIndex);
-		if (v != null) {
-			v.performClick();
-		}
+		if (v != null) v.performClick();
 		return true;
 	}
 
 	@Override
 	public boolean onSoftLeft() {
-		NokiaLog.i("Desktop", "左软键：功能表");
-		requireActivity(); // ensure attached
 		((NokiaDesktopActivity) requireActivity()).openMenu();
 		return true;
 	}
 
 	@Override
 	public boolean onSoftRight() {
-		NokiaLog.i("Desktop", "右软键：桌面设置");
 		((NokiaDesktopActivity) requireActivity()).openDesktopSettings();
 		return true;
 	}
 
 	@Override
 	public boolean onBack() {
-		// 桌面不处理返回，由 Activity 处理（回到 Android Home）
 		return false;
 	}
 
-	// ---- NokiaPage 接口（底部菜单栏声明，由 host.refreshPageBar() 装配） ----
+	// ---- NokiaPage ----
 
 	@Override
-	public String getPageTitle() {
-		// 桌面场景底部中间留空
-		return null;
-	}
+	public String getPageTitle() { return null; }
 
 	@Override
-	public String getSoftLeftText() {
-		return "功能表";
-	}
+	public String getSoftLeftText() { return "功能表"; }
 
 	@Override
-	public String getSoftRightText() {
-		return "桌面设置";
-	}
+	public String getSoftRightText() { return "桌面设置"; }
 
-	// ---- 导航逻辑 ----
+	// ---- 导航 ----
 
-	/** 快捷栏最后一个索引（不含） */
 	private int shortcutLast() { return shortcutCount; }
+	private int widgetFirst() { return shortcutCount; }
+	private int widgetLast() { return shortcutCount + widgetCount; }
 
-	/** 通知区第一个索引 */
-	private int notifFirst() { return shortcutCount; }
-
-	/** 通知区最后一个索引（不含） */
-	private int notifLast() { return shortcutCount + NOTIF_COUNT; }
-
-	private boolean isInShortcuts() {
-		return focusIndex >= SHORTCUT_FIRST && focusIndex < shortcutLast();
-	}
-
-	private boolean isInNotifications() {
-		return focusIndex >= notifFirst() && focusIndex < notifLast();
-	}
+	private boolean isInShortcuts() { return focusIndex >= SHORTCUT_FIRST && focusIndex < shortcutLast(); }
+	private boolean isInWidgets() { return focusIndex >= widgetFirst() && focusIndex < widgetLast(); }
 
 	private boolean moveUp() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
-			if (focusIndex != SHORTCUT_FIRST) {
-				newIdx = SHORTCUT_FIRST;
-			}
-		} else if (isInNotifications()) {
-			if (focusIndex > notifFirst()) {
+			if (focusIndex != SHORTCUT_FIRST) newIdx = SHORTCUT_FIRST;
+		} else if (isInWidgets()) {
+			if (focusIndex > widgetFirst()) {
 				newIdx = focusIndex - 1;
 			} else {
-				// 从通知区第一项上移 → 快捷栏最后一项
 				if (shortcutCount > 0) newIdx = shortcutLast() - 1;
 			}
 		}
@@ -540,12 +754,13 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	private boolean moveDown() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
-			newIdx = notifFirst(); // 快捷栏 → 通知区第一个
-		} else if (isInNotifications()) {
-			if (focusIndex < notifLast() - 1) {
+			if (widgetCount > 0) {
+				newIdx = widgetFirst();
+			}
+		} else if (isInWidgets()) {
+			if (focusIndex < widgetLast() - 1) {
 				newIdx = focusIndex + 1;
 			} else {
-				// 通知区最后一个 → 快捷栏第一个
 				if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
 			}
 		}
@@ -557,11 +772,10 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		if (isInShortcuts()) {
 			if (focusIndex > SHORTCUT_FIRST) {
 				newIdx = focusIndex - 1;
-			} else {
-				// 环绕到快捷栏最后一个
-				if (shortcutCount > 1) newIdx = shortcutLast() - 1;
+			} else if (shortcutCount > 1) {
+				newIdx = shortcutLast() - 1;
 			}
-		} else if (isInNotifications()) {
+		} else if (isInWidgets()) {
 			if (shortcutCount > 0) newIdx = shortcutLast() - 1;
 		}
 		return applyFocus(newIdx);
@@ -572,10 +786,10 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		if (isInShortcuts()) {
 			if (focusIndex < shortcutLast() - 1) {
 				newIdx = focusIndex + 1;
-			} else {
-				if (shortcutCount > 1) newIdx = SHORTCUT_FIRST;
+			} else if (shortcutCount > 1) {
+				newIdx = SHORTCUT_FIRST;
 			}
-		} else if (isInNotifications()) {
+		} else if (isInWidgets()) {
 			if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
 		}
 		return applyFocus(newIdx);
@@ -597,8 +811,6 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		View target = focusTargets.get(index);
 		if (target == null) return;
 
-		// 沿父链查找 HorizontalScrollView，非 View 的父节点直接跳过
-		// （防御 UnisocViewRootImpl 等特殊设备上抛 ClassCastException）
 		ViewParent parent = target.getParent();
 		while (parent instanceof View) {
 			View pv = (View) parent;
@@ -613,7 +825,6 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 	private void setFocusIndex(int index) {
 		if (index < 0 || index >= focusTargets.size()) return;
-		// 清除旧选中
 		if (focusIndex >= 0 && focusIndex < focusTargets.size()) {
 			View old = focusTargets.get(focusIndex);
 			if (old != null) old.setBackgroundResource(0);
@@ -624,7 +835,6 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			v.setBackgroundResource(R.drawable.bg_nokia_selected);
 			selectedView = v;
 		}
-		// 选中项在图标正上方显示名称气泡（仅快捷栏内，其余区域隐藏）
 		if (isInShortcuts() && v != null) {
 			showShortcutBubble(index, v);
 		} else {
@@ -632,83 +842,46 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		}
 	}
 
-	/** 在选中快捷应用图标正上方浮出名称气泡。 */
 	private void showShortcutBubble(int index, View cell) {
 		if (shortcutNameBubble == null || shortcutBar == null) return;
 		if (index < 0 || index >= shortcutApps.size()) return;
 		ShortcutApp app = shortcutApps.get(index);
 		shortcutNameBubble.setText(app.label);
 
-		// 中间内容根（RelativeLayout）宽度，作为气泡最大宽度基准
 		int contentW = (int) (240 * getResources().getDisplayMetrics().density);
 		View parent = (View) shortcutNameBubble.getParent();
-		if (parent != null && parent.getWidth() > 0) {
-			contentW = parent.getWidth();
-		}
-		// 测量气泡尺寸（宽度不超过中间内容宽度，过长则省略）
+		if (parent != null && parent.getWidth() > 0) contentW = parent.getWidth();
 		shortcutNameBubble.measure(
 				View.MeasureSpec.makeMeasureSpec(Math.max(0, contentW - 4), View.MeasureSpec.AT_MOST),
 				View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
 		int bw = shortcutNameBubble.getMeasuredWidth();
-		int bh = shortcutNameBubble.getMeasuredHeight();
 
-		// 选中图标中心相对中间内容根的坐标（考虑横向滚动偏移）
-		int cx = shortcutBar.getLeft()
-				+ (cell.getLeft() - shortcutBar.getScrollX())
-				+ cell.getWidth() / 2;
+		int cx = shortcutBar.getLeft() + (cell.getLeft() - shortcutBar.getScrollX()) + cell.getWidth() / 2;
 		int left = cx - bw / 2;
 		int maxLeft = contentW - bw - 2;
 		if (left < 2) left = 2;
 		if (left > maxLeft) left = Math.max(2, maxLeft);
 		shortcutNameBubble.setX(left);
-		// 气泡半透明浮在快捷栏图标下方（不遮挡图标），不占用布局空间
 		shortcutNameBubble.setY(shortcutBar.getTop() + shortcutBar.getHeight() + NokiaDimens.dp(getResources(), 1));
 		shortcutNameBubble.setVisibility(View.VISIBLE);
-		NokiaLog.d("Desktop", "显示快捷栏名称气泡: " + app.label + " @x=" + left);
 
-		// 显示约 2 秒后自动消失
 		bubbleHandler.removeCallbacks(bubbleHideRunnable);
 		bubbleHandler.postDelayed(bubbleHideRunnable, BUBBLE_DURATION);
 	}
 
-	/** 延迟隐藏名称气泡的 Runnable。 */
-	private final Runnable bubbleHideRunnable = new Runnable() {
-		@Override
-		public void run() {
-			hideShortcutBubble();
-		}
-	};
+	private final Runnable bubbleHideRunnable = () -> hideShortcutBubble();
 
-	/** 隐藏名称气泡。 */
 	private void hideShortcutBubble() {
-		if (bubbleHandler != null) {
-			bubbleHandler.removeCallbacks(bubbleHideRunnable);
-		}
-		if (shortcutNameBubble != null) {
-			shortcutNameBubble.setVisibility(View.GONE);
-		}
+		if (bubbleHandler != null) bubbleHandler.removeCallbacks(bubbleHideRunnable);
+		if (shortcutNameBubble != null) shortcutNameBubble.setVisibility(View.GONE);
 	}
 
 	@Override
 	public void onDestroyView() {
 		super.onDestroyView();
-		if (bubbleHandler != null) {
-			bubbleHandler.removeCallbacks(bubbleHideRunnable);
-		}
+		if (bubbleHandler != null) bubbleHandler.removeCallbacks(bubbleHideRunnable);
 		bubbleHandler = null;
 		shortcutNameBubble = null;
 		shortcutBar = null;
 	}
-
-	// ---- 快捷栏点击（触摸）- 已由 cell 的 onClickListener 直接处理 ----
-
-	// ---- 电话、联系人快捷操作 ----
-
-	private void openContacts() {
-		try {
-			startActivity(new Intent(Intent.ACTION_VIEW,
-					android.provider.ContactsContract.Contacts.CONTENT_URI));
-		} catch (Exception ignored) {}
-	}
-
 }
