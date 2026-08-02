@@ -6,12 +6,14 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
+import ru.playsoftware.j2meloader.nokia.NokiaDimens;
 import ru.playsoftware.j2meloader.nokia.NokiaLog;
 
 /**
@@ -44,6 +46,8 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_nokia);
 		setupNokiaUi();
+		// 对底部快捷栏内层内容做整体缩放（与底栏一致，沿用 240 基准 + setScaleX/Y 架构）
+		scaleShortcutBar();
 		findViewById(R.id.midPanel).setVisibility(View.VISIBLE);
 
 		// 底部软键触摸点击：等效于对应物理软键（修复「桌面设置」等页触摸返回无效）
@@ -105,6 +109,12 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		} else {
 			NokiaLog.d("Desktop", "refreshPageBar: 当前 Fragment 未实现 NokiaPage（"
 					+ (f != null ? f.getClass().getSimpleName() : "null") + "），忽略");
+		}
+		// 快捷应用栏仅桌面待机屏显示（位于中面板与底栏之间），其他页面隐藏。
+		if (f instanceof NokiaDesktopFragment) {
+			showShortcutBar();
+		} else {
+			hideShortcutBar();
 		}
 	}
 
@@ -296,6 +306,58 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	/** 复位「已消费 DOWN 的 keyCode」，用于本层未消费该按键的路径，避免误吞后续 UP。 */
 	private void resetLastHandledKeyCode() {
 		lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+	}
+
+	// ---- 快捷应用栏（位于中面板与底栏之间，仅桌面待机屏显示） ----
+
+	/** 对快捷栏内层 240dp 内容做等比缩放，沿用整体缩放架构（不强制 setVisible，由显隐方法控制）。 */
+	private void scaleShortcutBar() {
+		View panel = findViewById(R.id.shortcutBarPanel);
+		if (panel == null) return;
+		float scale = getScale();
+		if (panel instanceof ViewGroup && ((ViewGroup) panel).getChildCount() > 0) {
+			View content = ((ViewGroup) panel).getChildAt(0);
+			content.setPivotX(0);
+			content.setPivotY(0);
+			// scale≈1（240x320 基准屏）时跳过变换层，避免像素被二次过滤发虚。
+			if (Math.abs(scale - 1f) >= 0.001f) {
+				content.setScaleX(scale);
+				content.setScaleY(scale);
+			}
+			// 显式设置外层高度：setScaleY 是视觉变换，wrap_content 不会感知，
+			// 必须按设计高度 44dp（点线 1+padding 4+cell 34+padding 4+点线 1）× scale 计算，否则图标会被截断。
+			ViewGroup.LayoutParams lp = panel.getLayoutParams();
+			lp.height = Math.round(NokiaDimens.dpF(getResources(), 44) * scale);
+			panel.setLayoutParams(lp);
+		}
+		// 快捷栏与底部软键栏之间的缝隙：基准 6dp 按整体 scale 放大，吸附整数像素避免发虚。
+		View gap = findViewById(R.id.shortcutBarGap);
+		if (gap != null) {
+			int gapPx = Math.round(NokiaDimens.dpF(getResources(), 6) * scale);
+			ViewGroup.LayoutParams lp = gap.getLayoutParams();
+			lp.height = gapPx;
+			gap.setLayoutParams(lp);
+			NokiaLog.d("Desktop", "scaleShortcutBar 缝隙高度=" + gapPx + "px scale=" + scale);
+		}
+		NokiaLog.d("Desktop", "scaleShortcutBar 完成 scale=" + scale);
+	}
+
+	/** 显示快捷应用栏（仅桌面待机屏调用）。 */
+	public void showShortcutBar() {
+		View panel = findViewById(R.id.shortcutBarPanel);
+		if (panel != null) {
+			panel.setVisibility(View.VISIBLE);
+			NokiaLog.d("Desktop", "showShortcutBar 显示快捷栏");
+		}
+	}
+
+	/** 隐藏快捷应用栏（进入功能表/百宝箱/设置等页面时调用）。 */
+	public void hideShortcutBar() {
+		View panel = findViewById(R.id.shortcutBarPanel);
+		if (panel != null) {
+			panel.setVisibility(View.GONE);
+			NokiaLog.d("Desktop", "hideShortcutBar 隐藏快捷栏");
+		}
 	}
 
 	/**

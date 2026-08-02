@@ -24,6 +24,81 @@
             android:layout_weight="1"
             android:visibility="invisible" />
 
+        <!-- 桌面快捷应用栏：位于中面板与底部软键栏之间，仅桌面待机屏显示（默认隐藏）。
+             外层 match_parent 铺满，内层 240dp 内容由基类按整体缩放架构 setScaleX/Y。
+             结构同 nokia_bottom_bar：点线 + 横向滚动快捷栏 + 点线 + 浮于栏上方的名称气泡。 -->
+        <LinearLayout
+            android:id="@+id/shortcutBarPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_nokia_softkey"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="240dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- 快捷栏上方的点线分割线（代码覆盖背景为 NokiaDashedLineDrawable 点阵） -->
+                <View
+                    android:id="@+id/shortcutDividerTop"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp" />
+
+                <HorizontalScrollView
+                    android:id="@+id/shortcutBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/shortcutContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="4dp"
+                        android:paddingTop="4dp"
+                        android:paddingEnd="4dp"
+                        android:paddingBottom="4dp" />
+                </HorizontalScrollView>
+
+                <!-- 快捷栏下方的点线分割线（代码覆盖背景为 NokiaDashedLineDrawable 点阵） -->
+                <View
+                    android:id="@+id/shortcutDivider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 快捷栏与底部软键栏之间的缝隙（高度由 scaleShortcutBar 按 scale 动态设置，保证跨分辨率视觉一致） -->
+        <View
+            android:id="@+id/shortcutBarGap"
+            android:layout_width="match_parent"
+            android:layout_height="0dp" />
+
         <include layout="@layout/nokia_bottom_bar" />
     </LinearLayout>
+
+    <!-- 选中快捷应用时浮出的名称气泡：根 FrameLayout 覆盖层，绝对定位浮于快捷栏上方，不占布局流 -->
+    <TextView
+        android:id="@+id/shortcutNameBubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_nokia_bubble"
+        android:gravity="center"
+        android:maxWidth="200dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingStart="6dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="2dp"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
+        android:visibility="gone" />
 </FrameLayout>

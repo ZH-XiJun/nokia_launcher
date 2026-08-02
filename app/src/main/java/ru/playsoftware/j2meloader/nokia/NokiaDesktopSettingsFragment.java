@@ -31,7 +31,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 	};
 
 	private static final String[] ITEM_NAMES = {
-			"顶部快捷栏设置",
+			"底部快捷栏设置",
 			"壁纸设置",
 			"桌面组件设置",
 			"按键绑定",

@@ -78,13 +78,14 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.scaleMidContent(view, true);
 
-		shortcutBar = view.findViewById(R.id.shortcutBar);
-		shortcutNameBubble = view.findViewById(R.id.shortcutNameBubble);
+		// 快捷栏位于 Activity 级布局（中面板与底栏之间），从 Activity 获取引用
+		shortcutBar = requireActivity().findViewById(R.id.shortcutBar);
+		shortcutNameBubble = requireActivity().findViewById(R.id.shortcutNameBubble);
 		bubbleHandler = new Handler(Looper.getMainLooper());
 
 		// 点线分割线
-		View dividerTop = view.findViewById(R.id.shortcutDividerTop);
-		View dividerBottom = view.findViewById(R.id.shortcutDivider);
+		View dividerTop = requireActivity().findViewById(R.id.shortcutDividerTop);
+		View dividerBottom = requireActivity().findViewById(R.id.shortcutDivider);
 		if (dividerTop != null) {
 			dividerTop.setBackground(new NokiaDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
 		}
@@ -146,9 +147,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	}
 
 	private void rebuildShortcutBar(List<ShortcutApp> apps) {
-		View view = getView();
-		if (view == null) return;
-		LinearLayout container = view.findViewById(R.id.shortcutContainer);
+		LinearLayout container = requireActivity().findViewById(R.id.shortcutContainer);
 		if (container == null) return;
 
 		long buildStart = System.currentTimeMillis();
@@ -182,13 +181,14 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		}
 
 		// 收集组件区焦点（排在快捷项之后）
-		collectWidgetTargets(view);
+		collectWidgetTargets(getView());
 
 		long buildElapsed = System.currentTimeMillis() - buildStart;
 		NokiaLog.i("Desktop", "快捷栏已构建：" + apps.size() + " 项，共 " + focusTargets.size()
 				+ " 个焦点，耗时 " + buildElapsed + "ms");
 
-		view.post(() -> {
+		final View rootView = getView();
+		if (rootView != null) rootView.post(() -> {
 			if (focusTargets.size() > 0) {
 				setFocusIndex(0);
 			}
@@ -762,7 +762,10 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	private boolean moveUp() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
-			if (focusIndex != SHORTCUT_FIRST) newIdx = SHORTCUT_FIRST;
+			// 从快捷栏按"上"：跳到组件区底部（最靠近的位置），无组件区则不移动
+			if (widgetCount > 0) {
+				newIdx = widgetLast() - 1;
+			}
 		} else if (isInWidgets()) {
 			if (focusIndex > widgetFirst()) {
 				newIdx = focusIndex - 1;
@@ -870,21 +873,26 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		ShortcutApp app = shortcutApps.get(index);
 		shortcutNameBubble.setText(app.label);
 
-		int contentW = (int) (240 * getResources().getDisplayMetrics().density);
-		View parent = (View) shortcutNameBubble.getParent();
-		if (parent != null && parent.getWidth() > 0) contentW = parent.getWidth();
+		// 气泡是 Activity 根 FrameLayout 覆盖层，坐标用窗口绝对坐标计算
+		int[] barLoc = new int[2];
+		int[] cellLoc = new int[2];
+		shortcutBar.getLocationInWindow(barLoc);
+		cell.getLocationInWindow(cellLoc);
+
 		shortcutNameBubble.measure(
-				View.MeasureSpec.makeMeasureSpec(Math.max(0, contentW - 4), View.MeasureSpec.AT_MOST),
+				View.MeasureSpec.makeMeasureSpec((int) (200 * getResources().getDisplayMetrics().density), View.MeasureSpec.AT_MOST),
 				View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
 		int bw = shortcutNameBubble.getMeasuredWidth();
+		int bh = shortcutNameBubble.getMeasuredHeight();
 
-		int cx = shortcutBar.getLeft() + (cell.getLeft() - shortcutBar.getScrollX()) + cell.getWidth() / 2;
-		int left = cx - bw / 2;
-		int maxLeft = contentW - bw - 2;
+		// 气泡水平中心对齐选中 cell 中心；浮于快捷栏上方（栏顶之上留 1dp 间隙）
+		int cellCx = cellLoc[0] + cell.getWidth() / 2;
+		int left = cellCx - bw / 2;
+		int right = getResources().getDisplayMetrics().widthPixels - 2;
 		if (left < 2) left = 2;
-		if (left > maxLeft) left = Math.max(2, maxLeft);
+		if (left + bw > right) left = Math.max(2, right - bw);
 		shortcutNameBubble.setX(left);
-		shortcutNameBubble.setY(shortcutBar.getTop() + shortcutBar.getHeight() + NokiaDimens.dp(getResources(), 1));
+		shortcutNameBubble.setY(barLoc[1] - bh - NokiaDimens.dp(getResources(), 1));
 		shortcutNameBubble.setVisibility(View.VISIBLE);
 
 		bubbleHandler.removeCallbacks(bubbleHideRunnable);
