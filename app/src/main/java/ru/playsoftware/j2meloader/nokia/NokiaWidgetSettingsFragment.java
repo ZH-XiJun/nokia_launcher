@@ -273,8 +273,13 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 				NokiaLog.i(TAG, "确认键：应用类组件进入编辑（换绑） label=" + item.label);
 				((NokiaDesktopActivity) requireActivity())
 						.openFragment(NokiaWidgetAppPickerFragment.newEditMode(focusIndex));
+			} else if (item.type == NokiaWidgetItem.TYPE_URL) {
+				// 网址类组件：进入网址编辑页（编辑模式）
+				NokiaLog.i(TAG, "确认键：网址类组件进入编辑 label=" + item.label);
+				((NokiaDesktopActivity) requireActivity())
+						.openFragment(NokiaWidgetUrlEditFragment.newEditMode(focusIndex));
 			} else {
-				// 网址/Activity 的编辑页在后续文档定义，暂未实现
+				// Activity 的编辑页在后续文档定义，暂未实现
 				NokiaLog.i(TAG, "确认键：可编辑组件，编辑页待实现 label=" + item.label);
 				showToast("该类型编辑功能待实现");
 			}
