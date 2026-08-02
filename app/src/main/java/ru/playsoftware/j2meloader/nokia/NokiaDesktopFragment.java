@@ -540,8 +540,30 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 					}
 				});
 				break;
+			case NokiaWidgetItem.TYPE_CALENDAR:
+				row.setOnClickListener(v -> {
+					NokiaLog.i("Desktop", "打开日历");
+					try {
+						Intent intent = new Intent(Intent.ACTION_MAIN);
+						intent.addCategory(Intent.CATEGORY_APP_CALENDAR);
+						intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+						startActivity(intent);
+					} catch (Exception e) {
+						// 没有日历应用时降级为通用 VIEW
+						NokiaLog.w("Desktop", "无日历应用，尝试通用打开");
+						try {
+							Intent fallback = new Intent(Intent.ACTION_VIEW);
+							fallback.setData(android.provider.CalendarContract.CONTENT_URI);
+							fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+							startActivity(fallback);
+						} catch (Exception e2) {
+							NokiaLog.e("Desktop", "打开日历失败", e2);
+						}
+					}
+				});
+				break;
 			default:
-				// 不可编辑类型无点击行为
+				// 内存、存储、使用时长等不可编辑类型无点击行为
 				break;
 		}
 	}
