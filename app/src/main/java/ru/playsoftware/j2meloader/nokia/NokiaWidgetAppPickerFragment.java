@@ -49,14 +49,17 @@ import ru.playsoftware.j2meloader.appsdb.AppItemDao;
 import ru.playsoftware.j2meloader.config.Config;
 
 /**
- * 桌面组件设置 → 添加组件 → 应用选择页（应用类组件添加/编辑）。
- * 同一界面通过 Bundle 区分两种模式：
+ * 桌面组件设置 → 添加组件 → 应用选择页（应用类组件添加/编辑 + Activity快捷选应用）。
+ * 同一界面通过 Bundle 区分四种模式：
  * - ADD：从 S6 类型选择选「应用」进入，标题「选择应用」，确认键 addWidget → 回 S1；
- * - EDIT：从 S1 应用类组件确认键进入，标题「更换应用」，确认键 updateWidget(editIndex) → 回 S1。
+ * - EDIT：从 S1 应用类组件确认键进入，标题「更换应用」，确认键 updateWidget(editIndex) → 回 S1；
+ * - ACTIVITY_ADD：从 S6 类型选择选「Activity快捷」进入，标题「选择应用」，确认键 → 进入步骤2选Activity；
+ * - ACTIVITY_EDIT：从 S1 Activity快捷组件确认键进入，标题「选择应用」，确认键 → 进入步骤2选Activity。
  * <p>
  * 混合展示安卓应用 + J2ME 应用（不分组，按名称排序），宫格列数 3~5 自适应、
  * 行数按实测 panelH 反推；顶部搜索框可方向键聚焦、两步激活 EditText 过滤；
  * 已添加应用灰色不可选；EDIT 模式当前编辑项浅蓝底 + 📌 角标、光标初始定位其上。
+ * ACTIVITY_ADD / ACTIVITY_EDIT 模式不做已添加标记（Activity快捷可与应用组件共存）。
  */
 public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage {
 
@@ -65,6 +68,8 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 	private static final String EXTRA_EDIT_INDEX = "editIndex";
 	private static final int MODE_ADD = 0;
 	private static final int MODE_EDIT = 1;
+	private static final int MODE_ACTIVITY_ADD = 2;
+	private static final int MODE_ACTIVITY_EDIT = 3;
 
 	private static final int COLS_MIN = 3;
 	private static final int COLS_MAX = 5;
@@ -144,6 +149,28 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 		return f;
 	}
 
+	public static NokiaWidgetAppPickerFragment newActivityAddMode() {
+		NokiaWidgetAppPickerFragment f = new NokiaWidgetAppPickerFragment();
+		Bundle b = new Bundle();
+		b.putInt(EXTRA_MODE, MODE_ACTIVITY_ADD);
+		f.setArguments(b);
+		return f;
+	}
+
+	public static NokiaWidgetAppPickerFragment newActivityEditMode(int editIndex) {
+		NokiaWidgetAppPickerFragment f = new NokiaWidgetAppPickerFragment();
+		Bundle b = new Bundle();
+		b.putInt(EXTRA_MODE, MODE_ACTIVITY_EDIT);
+		b.putInt(EXTRA_EDIT_INDEX, editIndex);
+		f.setArguments(b);
+		return f;
+	}
+
+	/** 是否处于 Activity 快捷组件的添加/编辑流程（步骤1 选应用）。 */
+	private boolean isActivityMode() {
+		return mode == MODE_ACTIVITY_ADD || mode == MODE_ACTIVITY_EDIT;
+	}
+
 	@Nullable
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -168,8 +195,7 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 			mode = args.getInt(EXTRA_MODE, MODE_ADD);
 			editIndex = args.getInt(EXTRA_EDIT_INDEX, -1);
 		}
-		NokiaLog.i(TAG, "初始化 mode=" + (mode == MODE_EDIT ? "EDIT" : "ADD")
-				+ " editIndex=" + editIndex);
+		NokiaLog.i(TAG, "初始化 mode=" + modeName() + " editIndex=" + editIndex);
 
 		storage = new NokiaWidgetStorage(requireContext());
 		grid = view.findViewById(R.id.appGrid);
@@ -198,6 +224,15 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 		});
 	}
 
+	private String modeName() {
+		switch (mode) {
+			case MODE_EDIT: return "EDIT";
+			case MODE_ACTIVITY_ADD: return "ACTIVITY_ADD";
+			case MODE_ACTIVITY_EDIT: return "ACTIVITY_EDIT";
+			default: return "ADD";
+		}
+	}
+
 	private void updateTitle() {
 		TextView tv = getView() == null ? null : getView().findViewById(R.id.tvAppPickerTitle);
 		if (tv != null) {
@@ -209,21 +244,24 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 
 	private void loadAddedKeys() {
 		List<NokiaWidgetItem> widgets = storage.getWidgets();
-		for (int i = 0; i < widgets.size(); i++) {
-			NokiaWidgetItem w = widgets.get(i);
-			if (w.type != NokiaWidgetItem.TYPE_APP) continue;
-			if (w.value != null && !w.value.isEmpty()) {
-				addedKeys.add(w.value);
+		// Activity 模式下不做已添加标记（Activity快捷可与应用组件共存于不同应用）
+		if (!isActivityMode()) {
+			for (int i = 0; i < widgets.size(); i++) {
+				NokiaWidgetItem w = widgets.get(i);
+				if (w.type != NokiaWidgetItem.TYPE_APP) continue;
+				if (w.value != null && !w.value.isEmpty()) {
+					addedKeys.add(w.value);
+				}
 			}
 		}
-		if (mode == MODE_EDIT) {
+		if (mode == MODE_EDIT || mode == MODE_ACTIVITY_EDIT) {
 			if (editIndex >= 0 && editIndex < widgets.size()) {
 				currentEditValue = widgets.get(editIndex).value;
 				NokiaLog.i(TAG, "EDIT 模式当前编辑项 value=" + currentEditValue);
 			} else {
 				// editIndex 越界 → 降级为添加模式
 				NokiaLog.w(TAG, "editIndex 越界 " + editIndex + "/" + widgets.size() + "，降级为添加模式");
-				mode = MODE_ADD;
+				mode = isActivityMode() ? MODE_ACTIVITY_ADD : MODE_ADD;
 				updateTitle();
 			}
 		}
@@ -602,7 +640,7 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 
 	/** EDIT 模式初始定位到当前编辑项所在格；ADD 模式定位到第一格。 */
 	private void setInitialFocus() {
-		if (mode == MODE_EDIT && !editLocateDone && currentEditValue != null) {
+		if ((mode == MODE_EDIT || mode == MODE_ACTIVITY_EDIT) && !editLocateDone && currentEditValue != null) {
 			for (int i = 0; i < filtered.size(); i++) {
 				if (currentEditValue.equals(filtered.get(i).key)) {
 					pageIndex = i / perPage;
@@ -743,7 +781,8 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 			return false;
 		}
 		AppEntry app = filtered.get(global);
-		if (cellAdded[focusPos] || cellCurrent[focusPos]) {
+		// Activity 模式不做已添加标记，所有应用可选
+		if (!isActivityMode() && (cellAdded[focusPos] || cellCurrent[focusPos])) {
 			NokiaLog.i(TAG, "确认键：该应用已添加/当前编辑项，不可选择 label=" + app.label);
 			return true; // 消费，不响应
 		}
@@ -751,10 +790,25 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 		return true;
 	}
 
-	/** 添加/更换应用组件并返回上一层。 */
+	/** 添加/更换应用组件并返回上一层（普通模式），或进入步骤2选Activity（Activity模式）。 */
 	private void confirmSelection(AppEntry app) {
 		NokiaLog.i(TAG, "选中应用 label=" + app.label + " key=" + app.key);
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+
+		if (isActivityMode()) {
+			// Activity 模式：选中应用 → 进入步骤2（选择 Activity）
+			String pkg = extractPackageName(app.key);
+			NokiaLog.i(TAG, "Activity模式：进入步骤2 选Activity pkg=" + pkg + " appLabel=" + app.label);
+			NokiaWidgetActivityPickerFragment picker;
+			if (mode == MODE_ACTIVITY_EDIT) {
+				picker = NokiaWidgetActivityPickerFragment.newEditMode(pkg, app.label, editIndex);
+			} else {
+				picker = NokiaWidgetActivityPickerFragment.newAddMode(pkg, app.label);
+			}
+			host.openFragment(picker);
+			return;
+		}
+
 		if (mode == MODE_EDIT) {
 			// EDIT 模式：栈为 S1 → AppPicker，pop 一层回到 S1
 			NokiaWidgetItem item = new NokiaWidgetItem(NokiaWidgetItem.TYPE_APP, app.label, app.key);
@@ -783,6 +837,13 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 				NokiaLog.i(TAG, "ADD 确认后出栈 1 层");
 			}
 		}
+	}
+
+	/** 从 app.key（格式：pkg/cls）中提取包名。 */
+	private String extractPackageName(String key) {
+		if (key == null) return "";
+		int slash = key.indexOf('/');
+		return slash >= 0 ? key.substring(0, slash) : key;
 	}
 
 	@Override
@@ -826,6 +887,18 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 	@Override
 	public String getSoftRightText() {
 		return "返回";
+	}
+
+	/** 右软键：Activity编辑模式回到 S1，其他模式回到上一层。 */
+	private void doExit() {
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		if (mode == MODE_ACTIVITY_EDIT) {
+			// 编辑模式：回到 S1（出栈一层）
+			host.exitCurrent();
+		} else {
+			// 添加模式：回到 S6 类型选择页（出栈一层）
+			host.exitCurrent();
+		}
 	}
 
 	// ---- 触摸滑动翻页 ----

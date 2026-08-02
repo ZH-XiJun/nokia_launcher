@@ -275,8 +275,9 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage
 						.openFragment(NokiaWidgetUrlEditFragment.newAddMode());
 				break;
 			case NokiaWidgetItem.TYPE_ACTIVITY:
-				// Activity 快捷编辑页由后续文档定义，暂未实现
-				showToast("该类型编辑功能待实现");
+				// Activity 快捷：进入步骤1（选择应用），详见 docs/6-Activity快捷组件添加编辑界面设计.md
+				((NokiaDesktopActivity) requireActivity())
+						.openFragment(NokiaWidgetAppPickerFragment.newActivityAddMode());
 				break;
 			default:
 				// 日历/内存/存储/使用时长：直接添加并返回 S1
