@@ -443,6 +443,8 @@ startActivity(intent);
 | 确认键 | 选中应用 → 进入步骤2（不添加组件） |
 | 右软键 | 回到 S6（添加模式）/ S1（编辑模式） |
 
+> ⚠️ **按键配对规范（DOWN/UP 成对消费）**：步骤1 确认键进入步骤2、步骤2 确认键进入步骤3 时，若确认键 DOWN 已在 `NokiaDesktopActivity.dispatchKeyEvent` 本层被消费（`return true`），须同步消费对应的 UP（含 REPEAT），禁止只消费 DOWN。否则 DOWN 被吞、UP 穿透到新步骤可点击 View 时，UP 会合成 `performClick()` 触发第二次动作（例：进入步骤2后又自动选中第一项；进入步骤3后又自动激活名称字段）。实现用 `lastHandledDownKeyCode` 记录被本层消费的 keyCode，非 DOWN 分支对相同 keyCode `return true` 吞掉，未消费键 DOWN 路径复位为 `KEYCODE_UNKNOWN`。步骤3 EditText 真正激活后的按键走系统软键盘，不受此约束。
+
 ### 步骤2（纵向列表选 Activity）
 
 | 按键 | 行为 |
@@ -538,7 +540,7 @@ Activity 快捷组件桌面显示用的图标是 `PackageManager.getApplicationI
 | 布局 XML | `app:srcCompat="@drawable/ic_nokia_xxx"` |
 | 代码加载 | `ContextCompat.getDrawable()` / `AppCompatResources.getDrawable()` |
 
-> 详见 `docs/vector-drawable-api19-fix.md`。
+> 详见 `安卓 4.4（API 19）矢量图崩溃修复计划.md`。
 
 ---
 
