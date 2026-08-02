@@ -606,7 +606,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 					if (s60Res != 0) {
 						try {
 							Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
-							if (s60Icon != null) return s60Icon;
+							if (s60Icon != null) return s60Icon.mutate();
 						} catch (Exception ignored) {}
 					}
 				}
@@ -631,7 +631,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 					if (s60Res != 0) {
 						try {
 							Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
-							if (s60Icon != null) return s60Icon;
+							if (s60Icon != null) return s60Icon.mutate();
 						} catch (Exception ignored) {}
 					}
 					try {

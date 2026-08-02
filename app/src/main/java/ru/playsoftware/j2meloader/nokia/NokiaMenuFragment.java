@@ -371,7 +371,13 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 
 	private Drawable safeDrawable(NokiaDesktopActivity host, int resId) {
 		try {
-			return ContextCompat.getDrawable(host, resId);
+			Drawable d = ContextCompat.getDrawable(host, resId);
+			// API 19 上多个 ImageView 共享同一 Bitmap 时，硬件加速渲染可能触发
+			// Adreno GL_INVALID_OPERATION 导致图标变黑；mutate 隔离 Drawable 状态
+			if (d != null) {
+				d = d.mutate();
+			}
+			return d;
 		} catch (Exception e) {
 			NokiaLog.w("Menu", "加载图标失败 res=" + resId);
 			return null;
