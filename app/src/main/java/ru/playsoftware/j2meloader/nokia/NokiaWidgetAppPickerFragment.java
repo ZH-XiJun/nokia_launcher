@@ -205,6 +205,11 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 		tvEmpty = view.findViewById(R.id.tvAppEmpty);
 		updateTitle();
 
+		// 重置状态，防止从步骤2返回后重复加载
+		pageIndex = 0;
+		focusPos = -1;
+		editLocateDone = false;
+		editing = false;
 		loadAddedKeys();
 		initSearch();
 		initSwipeListener(view);
@@ -243,6 +248,7 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 	// ---- 已添加组件标记 ----
 
 	private void loadAddedKeys() {
+		addedKeys.clear();
 		List<NokiaWidgetItem> widgets = storage.getWidgets();
 		// Activity 模式下不做已添加标记（Activity快捷可与应用组件共存于不同应用）
 		if (!isActivityMode()) {
@@ -354,8 +360,9 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 				+ " availDesign=" + availDesign);
 	}
 
-	/** 同步加载安卓应用（ACTION_MAIN + CATEGORY_LAUNCHER）。 */
+	/** 同步加载安卓应用（ACTION_MAIN + CATEGORY_LAUNCHER）。每次调用前清空已有数据，防止重复添加。 */
 	private void loadAndroidApps() {
+		allApps.clear();
 		PackageManager pm = requireActivity().getPackageManager();
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -387,12 +394,23 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 		.subscribe(
 			j2me -> {
 				if (!isAdded()) return;
-				NokiaLog.i(TAG, "J2ME 应用加载完成：" + j2me.size() + " 个，合入并刷新");
-				allApps.addAll(j2me);
-				sortApps();
-				refreshFilteredList();
-				buildPage();
-				setInitialFocus();
+				// 去重合入：已存在的 key 跳过，防止 J2ME 异步加载与安卓列表重复
+				Set<String> existingKeys = new HashSet<>();
+				for (AppEntry e : allApps) existingKeys.add(e.key);
+				int added = 0;
+				for (AppEntry e : j2me) {
+					if (!existingKeys.contains(e.key)) {
+						allApps.add(e);
+						added++;
+					}
+				}
+				NokiaLog.i(TAG, "J2ME 应用加载完成：" + j2me.size() + " 个，合入 " + added + " 个，去重跳过 " + (j2me.size() - added) + " 个");
+				if (added > 0) {
+					sortApps();
+					refreshFilteredList();
+					buildPage();
+					setInitialFocus();
+				}
 			},
 			error -> NokiaLog.e(TAG, "加载 J2ME 应用失败", error)
 		);
