@@ -16,7 +16,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 诺基亚桌面设置的 SharedPreferences 封装。
@@ -73,18 +75,24 @@ public class NokiaSettingsStorage {
 		void onLoaded(List<ShortcutApp> apps);
 	}
 
-	/** 获取已选择的快捷栏应用列表（同步，仅读 SharedPreferences / 首次同步构建，供设置页等非冷启动路径使用） */
+	/**
+	 * 获取已选择的快捷栏应用列表（同步，仅读 SharedPreferences / 首次同步构建，供设置页等非冷启动路径使用）。
+	 * 使用静态锁与 {@link #getShortcutAppsAsync} 的"检查-构建-写回"互斥，
+	 * 防止后台线程构建默认值时把用户刚保存的配置覆盖回默认值。
+	 */
 	public List<ShortcutApp> getShortcutApps() {
-		List<ShortcutApp> result = new ArrayList<>();
-		String json = prefs.getString(KEY_SHORTCUT_APPS, null);
-		if (json == null) {
-			// 首次启动：生成默认快捷应用（仅已安装的应用会被加入），并持久化
-			NokiaLog.i("SettingsStorage", "shortcut_apps 未配置，生成默认快捷应用");
-			result = buildDefaultShortcutApps();
-			setShortcutApps(result);
-			return result;
+		synchronized (NokiaSettingsStorage.class) {
+			List<ShortcutApp> result = new ArrayList<>();
+			String json = prefs.getString(KEY_SHORTCUT_APPS, null);
+			if (json == null) {
+				// 首次启动：生成默认快捷应用（仅已安装的应用会被加入），并持久化
+				NokiaLog.i("SettingsStorage", "shortcut_apps 未配置，生成默认快捷应用");
+				result = buildDefaultShortcutApps();
+				setShortcutApps(result);
+				return result;
+			}
+			return parseShortcutApps(json);
 		}
-		return parseShortcutApps(json);
 	}
 
 	/**
@@ -110,20 +118,31 @@ public class NokiaSettingsStorage {
 				long start = System.currentTimeMillis();
 				final List<ShortcutApp> defaults = buildDefaultShortcutApps();
 				long elapsed = System.currentTimeMillis() - start;
-				NokiaLog.i("SettingsStorage", "后台生成默认快捷应用完成: " + defaults.size()
-						+ " 个，耗时 " + elapsed + "ms");
-				setShortcutApps(defaults); // 持久化
+				// 写回前 double-check：构建默认值期间，设置页等可能已经保存了用户配置，
+				// 此时禁止覆盖，否则用户的 7 个选择会被"回滚"成默认值（安卓/J2ME 全部丢失）。
+				final List<ShortcutApp> actual;
+				synchronized (NokiaSettingsStorage.class) {
+					if (prefs.getString(KEY_SHORTCUT_APPS, null) == null) {
+						NokiaLog.i("SettingsStorage", "后台生成默认快捷应用完成: " + defaults.size()
+								+ " 个，耗时 " + elapsed + "ms，落盘");
+						setShortcutApps(defaults);
+					} else {
+						NokiaLog.w("SettingsStorage", "后台默认构建完成，但期间已有用户配置，放弃覆盖");
+					}
+					// 以实际存储内容为准回调，避免桌面渲染出与设置页不一致的数据
+					actual = parseShortcutApps(prefs.getString(KEY_SHORTCUT_APPS, null));
+				}
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
-						callback.onLoaded(defaults);
+						callback.onLoaded(actual);
 					}
 				});
 			}
 		}, "build-default-shortcuts").start();
 	}
 
-	/** 解析快捷栏 JSON；null/空返回空列表。 */
+	/** 解析快捷栏 JSON；null/空返回空列表。读取时按去重键过滤，清理历史遗留的同包重复入口。 */
 	private List<ShortcutApp> parseShortcutApps(String json) {
 		List<ShortcutApp> result = new ArrayList<>();
 		if (json == null || json.isEmpty()) {
@@ -131,14 +150,33 @@ public class NokiaSettingsStorage {
 		}
 		try {
 			JSONArray arr = new JSONArray(json);
+			// 按包名（安卓）/ pathExt（J2ME）去重，只保留第一个出现项，
+			// 处理设备上同包注册多个 launcher Activity（如系统短信/相机）导致的重复入口
+			Map<String, ShortcutApp> unique = new LinkedHashMap<>();
 			for (int i = 0; i < arr.length(); i++) {
-				result.add(ShortcutApp.fromJson(arr.getJSONObject(i)));
+				ShortcutApp app = ShortcutApp.fromJson(arr.getJSONObject(i));
+				unique.put(dedupeKey(app), app);
+			}
+			result.addAll(unique.values());
+			if (unique.size() < arr.length()) {
+				NokiaLog.w("SettingsStorage", "快捷栏配置存在同包重复入口，已去重: "
+						+ arr.length() + " -> " + unique.size());
 			}
 			NokiaLog.i("SettingsStorage", "getShortcutApps: 从存储读取 " + result.size() + " 个应用");
 		} catch (JSONException e) {
 			NokiaLog.e("SettingsStorage", "getShortcutApps 解析失败", e);
 		}
 		return result;
+	}
+
+	/** 快捷项去重键：安卓按包名（appKey 的 "/" 前缀），J2ME 按 pathExt。 */
+	private static String dedupeKey(ShortcutApp app) {
+		if (app.type == ShortcutApp.TYPE_ANDROID && app.appKey != null) {
+			int slash = app.appKey.indexOf('/');
+			String pkg = slash > 0 ? app.appKey.substring(0, slash) : app.appKey;
+			return "a:" + pkg;
+		}
+		return "j:" + (app.appKey != null ? app.appKey : app.label);
 	}
 
 	/**

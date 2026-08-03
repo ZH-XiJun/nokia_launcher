@@ -26,7 +26,9 @@ import androidx.sqlite.db.SupportSQLiteQuery;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import io.reactivex.Single;
@@ -46,7 +48,9 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 	private LinearLayout appListLayout;
 	private ScrollView appScroll;
 	private final List<NokiaAppItem> allApps = new ArrayList<>();
-	private final Set<String> selectedKeys = new HashSet<>(); // "type:appKey"
+	// 已选应用：key("type:appKey") -> ShortcutApp。以已保存列表为基准做增删，
+	// 避免"取消一个"时基于 allApps 重建导致未匹配项（J2ME / 已卸载应用）被静默丢弃。
+	private final Map<String, ShortcutApp> selectedMap = new LinkedHashMap<>();
 	private NokiaSettingsStorage settingsStorage;
 	private View[] itemViews;
 	private int focusIndex = -1;
@@ -104,12 +108,12 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 			}
 		});
 
-		// 加载已选中的应用
+		// 加载已选中的应用（以已保存列表为基准，避免构建列表不完整时丢失）
 		List<ShortcutApp> current = settingsStorage.getShortcutApps();
 		for (ShortcutApp app : current) {
-			selectedKeys.add(makeKey(app.type, app.appKey));
+			selectedMap.put(makeKey(app.type, app.appKey), app);
 		}
-		NokiaLog.i("ShortcutSettings", "已加载 " + selectedKeys.size() + " 个已选应用");
+		NokiaLog.i("ShortcutSettings", "已加载 " + selectedMap.size() + " 个已选应用");
 
 		// 异步加载应用列表
 		loadAppsAsync();
@@ -152,11 +156,18 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
 		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
 		String selfPkg = requireActivity().getPackageName();
+		// 同包多 launcher 入口（如系统相机/短信注册了多个 Activity）按包名去重，只保留第一个，
+		// 避免同一个应用在快捷栏列表里出现多项、被重复加入快捷栏
+		Set<String> seenPkgs = new HashSet<>();
 
 		for (ResolveInfo ri : list) {
 			ActivityInfo ai = ri.activityInfo;
 			if (ai == null) continue;
 			if (ai.packageName.equals(selfPkg)) continue;
+			if (!seenPkgs.add(ai.packageName)) {
+				NokiaLog.d("ShortcutSettings", "同包多入口去重: " + ai.packageName + "/" + ai.name);
+				continue;
+			}
 
 			CharSequence labelCs = ri.loadLabel(pm);
 			String label = (labelCs != null && labelCs.length() > 0) ? labelCs.toString() : ai.name;
@@ -314,7 +325,7 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 			tvCheck.setHeight(NokiaDimens.dp(getResources(), 24));
 			tvCheck.setGravity(Gravity.CENTER);
 			tvCheck.setTextSize(14);
-			if (selectedKeys.contains(key)) {
+			if (selectedMap.containsKey(key)) {
 				tvCheck.setText("[✓]");
 				tvCheck.setTextColor(0xFF4CAF50);
 			} else {
@@ -343,7 +354,10 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 		if (app.launchIntent != null && app.launchIntent.getComponent() != null) {
 			String cls = app.launchIntent.getComponent().getClassName();
 			if (cls != null && cls.startsWith("j2me:")) {
-				return ShortcutApp.TYPE_J2ME + ":" + cls; // 用 className 作为 J2ME 标识
+				// 与 ShortcutApp.appKey(pathExt) 保持一致：1:pathExt，
+				// 避免与已保存 key(1:pathExt) 不一致导致已选 J2ME 应用丢失
+				String[] parts = cls.split(":", 3);
+				return ShortcutApp.TYPE_J2ME + ":" + (parts.length > 2 ? parts[2] : cls);
 			}
 			return ShortcutApp.TYPE_ANDROID + ":"
 					+ app.launchIntent.getComponent().getPackageName() + "/"
@@ -361,11 +375,16 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 		NokiaAppItem app = allApps.get(index);
 		String key = makeKeyForItem(app);
 
-		if (selectedKeys.contains(key)) {
-			selectedKeys.remove(key);
+		if (selectedMap.containsKey(key)) {
+			selectedMap.remove(key);
 			NokiaLog.d("ShortcutSettings", "取消选中: " + app.label);
 		} else {
-			selectedKeys.add(key);
+			ShortcutApp sa = buildShortcutApp(app);
+			if (sa == null) {
+				NokiaLog.w("ShortcutSettings", "无法构造快捷项，忽略: " + app.label);
+				return;
+			}
+			selectedMap.put(key, sa);
 			NokiaLog.d("ShortcutSettings", "选中: " + app.label);
 		}
 
@@ -374,7 +393,7 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 			View row = itemViews[index];
 			TextView check = row.findViewWithTag("check_" + index);
 			if (check != null) {
-				if (selectedKeys.contains(key)) {
+				if (selectedMap.containsKey(key)) {
 					check.setText("[✓]");
 					check.setTextColor(0xFF4CAF50);
 				} else {
@@ -390,7 +409,7 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 
 	private void updateCountText() {
 		if (tvSelectedCount != null) {
-			tvSelectedCount.setText("已选 " + selectedKeys.size() + " / " + allApps.size() + " 项");
+			tvSelectedCount.setText("已选 " + selectedMap.size() + " / " + allApps.size() + " 项");
 		}
 	}
 
@@ -398,39 +417,40 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 
 	/** 仅持久化，不退出页面 */
 	private void persistSelection() {
-		List<ShortcutApp> result = new ArrayList<>();
-		for (NokiaAppItem app : allApps) {
-			String key = makeKeyForItem(app);
-			if (!selectedKeys.contains(key)) continue;
-
-			if (app.launchIntent != null && app.launchIntent.getComponent() != null) {
-				String cls = app.launchIntent.getComponent().getClassName();
-				if (cls != null && cls.startsWith("j2me:")) {
-					String[] parts = cls.split(":", 3);
-					String j2meLabel = parts.length > 1 ? parts[1] : app.label;
-					String j2mePath = parts.length > 2 ? parts[2] : "";
-					String iconPathStr = null;
-					String imgPath = Config.getAppDir() + new File(j2mePath).getName() + "/icon.png";
-					if (new File(imgPath).exists()) {
-						iconPathStr = imgPath;
-					}
-					result.add(new ShortcutApp(ShortcutApp.TYPE_J2ME, j2meLabel, j2mePath, iconPathStr));
-				} else {
-					Intent launch = new Intent(Intent.ACTION_MAIN);
-					launch.addCategory(Intent.CATEGORY_LAUNCHER);
-					launch.setClassName(
-							app.launchIntent.getComponent().getPackageName(),
-							app.launchIntent.getComponent().getClassName());
-					launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-					String appKey = app.launchIntent.getComponent().getPackageName()
-							+ "/" + app.launchIntent.getComponent().getClassName();
-					result.add(new ShortcutApp(ShortcutApp.TYPE_ANDROID, app.label, appKey, launch));
-				}
-			}
-		}
-
+		// 直接基于已选 Map 写回，仅增删用户实际操作的项；
+		// 不再遍历 allApps 重建，避免 key 不匹配 / 列表未加载完整的项被静默丢弃
+		List<ShortcutApp> result = new ArrayList<>(selectedMap.values());
 		settingsStorage.setShortcutApps(result);
 		NokiaLog.i("ShortcutSettings", "即时保存 " + result.size() + " 个快捷栏应用");
+	}
+
+	/** 根据列表项构造可持久化的 ShortcutApp；无法构造时返回 null */
+	private ShortcutApp buildShortcutApp(NokiaAppItem app) {
+		if (app.launchIntent == null || app.launchIntent.getComponent() == null) {
+			return null;
+		}
+		String cls = app.launchIntent.getComponent().getClassName();
+		if (cls != null && cls.startsWith("j2me:")) {
+			String[] parts = cls.split(":", 3);
+			String j2meLabel = parts.length > 1 ? parts[1] : app.label;
+			String j2mePath = parts.length > 2 ? parts[2] : "";
+			String iconPathStr = null;
+			String imgPath = Config.getAppDir() + new File(j2mePath).getName() + "/icon.png";
+			if (new File(imgPath).exists()) {
+				iconPathStr = imgPath;
+			}
+			return new ShortcutApp(ShortcutApp.TYPE_J2ME, j2meLabel, j2mePath, iconPathStr);
+		} else {
+			Intent launch = new Intent(Intent.ACTION_MAIN);
+			launch.addCategory(Intent.CATEGORY_LAUNCHER);
+			launch.setClassName(
+					app.launchIntent.getComponent().getPackageName(),
+					app.launchIntent.getComponent().getClassName());
+			launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+			String appKey = app.launchIntent.getComponent().getPackageName()
+					+ "/" + app.launchIntent.getComponent().getClassName();
+			return new ShortcutApp(ShortcutApp.TYPE_ANDROID, app.label, appKey, launch);
+		}
 	}
 
 	/** 保存并返回上一级（左软键行为） */
