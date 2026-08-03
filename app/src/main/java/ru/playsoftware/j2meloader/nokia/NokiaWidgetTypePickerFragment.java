@@ -25,9 +25,9 @@ import ru.playsoftware.j2meloader.R;
 
 /**
  * 桌面组件设置 → 添加组件 → 组件类型选择页（S6）。
- * 列出全部 7 种组件类型，方向键导航，确认键选择类型后跳转：
+ * 列出全部 8 种组件类型，方向键导航，确认键选择类型后跳转：
  * 应用/网址/Activity快捷 → 各自编辑页（后续文档，暂未实现）；
- * 日历/内存/存储/使用时长 → 直接添加组件并返回 S1。
+ * 日历/内存/存储/使用时长/锁屏 → 直接添加组件并返回 S1。
  * <p>
  * 「使用时长」依赖 UsageStatsManager（API 21+），Android 4.4 及以下显示为灰色、
  * 光标跳过、确认键无响应。
@@ -44,6 +44,7 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage
 			NokiaWidgetItem.TYPE_MEMORY,
 			NokiaWidgetItem.TYPE_STORAGE,
 			NokiaWidgetItem.TYPE_USAGE,
+			NokiaWidgetItem.TYPE_LOCK_SCREEN,
 	};
 
 	private LinearLayout listLayout;

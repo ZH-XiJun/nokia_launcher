@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.StatFs;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -367,7 +368,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		TextView labelTv = new TextView(ctx);
 		labelTv.setLayoutParams(new LinearLayout.LayoutParams(
 				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-		labelTv.setText(item.label);
+		labelTv.setText(getWidgetLabel(item));
 		labelTv.setTextColor(0xFFFFFFFF);
 		labelTv.setTextSize(11);
 		labelTv.setSingleLine(true);
@@ -388,6 +389,18 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		return row;
 	}
 
+	/** 获取组件主标签文字。锁屏组件动态显示「按下XX键锁屏」（XX 为当前绑定的锁屏键名，非 keycode）。 */
+	private String getWidgetLabel(NokiaWidgetItem item) {
+		if (item.type != NokiaWidgetItem.TYPE_LOCK_SCREEN) return item.label;
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		NokiaKeyBinding kb = host != null ? host.getKeyBinding() : null;
+		int kc = kb != null ? kb.getKeyCode(NokiaKeyBinding.ACTION_LOCK_SCREEN)
+				: KeyEvent.KEYCODE_UNKNOWN;
+		String keyName = NokiaLog.keyName(kc);
+		NokiaLog.i("Desktop", "锁屏组件提示文字: 按下" + keyName + "键锁屏");
+		return "按下" + keyName + "键锁屏";
+	}
+
 	/** 获取组件右侧展示信息（无进度条类型）。 */
 	private String getWidgetInfoText(NokiaWidgetItem item) {
 		switch (item.type) {
@@ -395,6 +408,8 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 				return getCalendarText();
 			case NokiaWidgetItem.TYPE_USAGE:
 				return getUsageText();
+			case NokiaWidgetItem.TYPE_LOCK_SCREEN:
+				return ""; // 提示文字已在主标签中，右侧留空
 			default:
 				return item.getTypeTag();
 		}
@@ -560,6 +575,13 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 							NokiaLog.e("Desktop", "打开日历失败", e2);
 						}
 					}
+				});
+				break;
+			case NokiaWidgetItem.TYPE_LOCK_SCREEN:
+				// 锁屏组件：点击执行一键锁屏（需设备管理员权限，未授权跳转系统激活页）
+				row.setOnClickListener(v -> {
+					NokiaLog.i("Desktop", "锁屏组件点击：执行锁屏");
+					NokiaLockScreen.lock(requireContext());
 				});
 				break;
 			default:
