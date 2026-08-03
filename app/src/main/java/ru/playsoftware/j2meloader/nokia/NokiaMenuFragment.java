@@ -1,5 +1,6 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
@@ -24,7 +25,9 @@ import androidx.fragment.app.Fragment;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import ru.playsoftware.j2meloader.MainActivity;
 import ru.playsoftware.j2meloader.R;
@@ -116,6 +119,12 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 	/** 防止 S60 图标异步扫描完成后重复刷新当前页图标 */
 	private boolean iconRefreshDone = false;
 
+	/** 应用显示名内存缓存（进程内复用，避免每次进入功能表反复 loadLabel IPC） */
+	private static final Map<String, String> labelCache = new HashMap<>();
+
+	/** 系统图标未加载完成前的占位图标（懒加载） */
+	private Drawable placeholderIcon;
+
 	/** 滑动翻页阈值（px，由 dp 换算）与最小速度（px/ms） */
 	private float swipeThreshold;
 	private float swipeMinVel;
@@ -196,9 +205,12 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 
 	private void loadApps() {
 		items.clear();
+		long loadStart = System.currentTimeMillis();
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		PackageManager pm = host.getPackageManager();
 
+		// 图标缓存：内存 + 磁盘 + 后台线程加载（避免主线程逐个 loadIcon IPC 卡顿）
+		NokiaAppIconCache.init(requireContext());
 		// S60 图标缓存：冷启动时桌面已通过 initAsync 异步扫描并持久化；
 		// 此处仅读磁盘缓存（毫秒级，无 PackageManager 批量查询），不阻塞功能表打开
 		NokiaS60IconMap.loadFromDisk(requireContext());
@@ -221,9 +233,17 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 				NokiaLog.d("Menu", "排除桌面自身: " + ai.packageName);
 				continue;
 			}
-			CharSequence labelCs = ri.loadLabel(pm);
-			String label = (labelCs != null && labelCs.length() > 0) ? labelCs.toString() : ai.name;
-			Drawable icon = ri.loadIcon(pm);
+			// 应用名走进程内缓存，避免每次进入功能表重复 loadLabel IPC
+			String labelKey = ai.packageName + "/" + ai.name;
+			String label = labelCache.get(labelKey);
+			if (label == null) {
+				CharSequence labelCs = ri.loadLabel(pm);
+				label = (labelCs != null && labelCs.length() > 0) ? labelCs.toString() : ai.name;
+				labelCache.put(labelKey, label);
+			}
+			// 不再在主线程 loadIcon（重 IPC，低端设备是功能表卡顿根因）；
+			// 系统图标交给 buildCurrentPage 里的 NokiaAppIconCache 后台加载。
+			Drawable icon = null;
 			Intent launch = new Intent(Intent.ACTION_MAIN);
 			launch.addCategory(Intent.CATEGORY_LAUNCHER);
 			launch.setClassName(ai.packageName, ai.name);
@@ -312,6 +332,8 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 
 		NokiaLog.i("Menu", "最终列表（固定槽位 " + pinned.size() + " + 特殊入口 + 匹配 " + matchedPool.size() + " + 未匹配 " + unmatchedPool.size() + "）共 " + items.size() + " 项");
 		totalPages = Math.max(1, (int) Math.ceil((double) items.size() / perPage));
+		NokiaLog.i("Menu", "loadApps 主线程耗时 " + (System.currentTimeMillis() - loadStart)
+				+ "ms（枚举 + label，不含系统图标 IPC）");
 
 		// S60 图标缓存：冷启动时桌面已后台扫描（scanStarted 防重复）；此处仅确保扫描已发起，
 		// 完成后在主线程刷新当前页应用图标（不重建网格，不影响焦点/分页）
@@ -384,6 +406,19 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 		}
 	}
 
+	/** 系统图标未加载完成前的占位图标（懒加载 + mutate 隔离，避免共享 Bitmap 变黑） */
+	private Drawable getPlaceholderIcon() {
+		if (placeholderIcon == null) {
+			try {
+				Drawable d = ContextCompat.getDrawable(requireContext(), R.mipmap.ic_launcher);
+				placeholderIcon = d != null ? d.mutate() : null;
+			} catch (Exception e) {
+				NokiaLog.w("Menu", "加载占位图标失败");
+			}
+		}
+		return placeholderIcon;
+	}
+
 	// ---- 构建当前页网格 ----
 
 	private void buildCurrentPage() {
@@ -436,6 +471,25 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 						// 避免 36dp 内降采样发虚（API 19 尤其明显）；真实应用图标密度感知，影响甚微。
 						item.icon.setFilterBitmap(false);
 						iv.setImageDrawable(item.icon);
+					} else if (item.type == NokiaAppItem.TYPE_APP
+							&& item.launchIntent != null
+							&& item.launchIntent.getComponent() != null) {
+						// S60 未命中 → 先显示占位，后台线程加载真实系统图标（内存/磁盘缓存复用）
+						iv.setImageDrawable(getPlaceholderIcon());
+						final String pkg = item.launchIntent.getComponent().getPackageName();
+						final ComponentName cn = item.launchIntent.getComponent();
+						final NokiaAppItem fItem = item;
+						iv.setTag(pkg);
+						NokiaAppIconCache.loadAsync(requireContext(), pkg, cn, (loadedPkg, d) -> {
+							// 校验：cell 仍属于该应用（翻页/重建后 tag 变化则跳过），
+							// 且该应用未被 S60 图标替换（S60 优先级高于系统图标）
+							if (d == null || iv.getTag() == null
+									|| !iv.getTag().equals(loadedPkg)) return;
+							if (fItem.s60IconResId != 0) return;
+							d.setFilterBitmap(false);
+							iv.setImageDrawable(d);
+							fItem.icon = d;
+						});
 					}
 					TextView tv = new TextView(requireContext());
 					tv.setLayoutParams(new LinearLayout.LayoutParams(
