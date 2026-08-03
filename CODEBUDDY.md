@@ -322,6 +322,26 @@ view.post(() -> {
 - **禁止**：`match_parent` + `topAlign=true` 的 Fragment 不加此调整；自行计算 scale（走 `getScale()` 单一来源）。
 - 已修复的案例：`NokiaKeyBindFragment`（已有）、`NokiaKeyBindWizardFragment`（补上后修复 320×480 偏下）。
 
+### Fragment 根布局宽度必须固定 240dp，禁止 match_parent（重要）
+
+**所有 Fragment 根布局宽度必须固定为 `240dp`（设计基准），禁止用 `match_parent`。** 否则在 scale>1 的设备（如 320×480）上会被 `scaleMidContent` 二次放大导致**横向溢出屏幕**，右侧内容（网格第 3 列等）被推出屏幕之外。
+
+背景与原因（2026-08 实测 bug：百宝箱「应用程序」第 3 列跑到屏幕右侧）：
+
+1. 项目架构为「240dp 设计基准 + 运行时整体缩放」：`NokiaBaseActivity.scaleMidContent()` 对 Fragment 根视图执行 `setScaleX/Y(scale)`，其中 `scale = 屏宽dp / 240`。
+2. 根宽 `match_parent` 时，内容**已经占满整个 midPanel 全宽**（如 320×480 设备即 320px），`scaleMidContent` 再乘 `scale`：
+   - 320×480（density 吸附到 1.0）scale=1.333 → `320 × 1.333 ≈ 427px > 320px`，右侧约 107px 溢出屏幕，网格第 3 列（qq2009）被推出右缘。
+   - 240×320 设备 scale=1，`scaleMidContent` 因 `Math.abs(scale-1) < 0.001` 跳过缩放，正常。故仅较高分辨率设备复现。
+3. 根宽固定 `240dp` 后，`240 × scale = 屏幕宽`，正好铺满，不再横向溢出。
+
+正确做法：
+
+- Fragment 根布局 `android:layout_width="240dp"`，与功能表 / 桌面 / 设置 / 向导 / 组件选择等全部 Fragment 一致。
+- **高度可用 `match_parent`**（配合 ScrollView 纵向滚动，如桌面、百宝箱），仅宽度必须 240dp。
+- 行内均分（如网格 cell 的 `0dp + weight=1`）按 240dp 计算，随后被整体缩放，逻辑不变。
+- **禁止**：根宽用 `match_parent`；在 240 基准之外再写宽度（如写死 dp 撑满屏）。
+- 已修复的案例：`fragment_nokia_box.xml`（根宽 `match_parent` → `240dp`，修复 320×480 横向溢出）。
+
 ### 新界面 Checklist
 
 新增或修改任何 nokia 界面时，逐项自查：
@@ -329,6 +349,7 @@ view.post(() -> {
 - [ ] 尺寸换算走 `NokiaDimens.dp()`，无裸 `(int)(v*density)`
 - [ ] 布局无 px 写死值（LayoutParams 高度/宽度、padding、margin 等）
 - [ ] Fragment 根布局高度为 `match_parent`（非 262dp）
+- [ ] Fragment 根布局**宽度固定 `240dp`**（非 `match_parent`，否则 scale>1 设备横向溢出）
 - [ ] 弹窗关键尺寸引用 `dimens.xml`（非硬编码 28dp/14sp/12sp）
 - [ ] 点线分隔线用 `NokiaDashedLineDrawable(getResources(), ...)`（非 XML shape dash）
 - [ ] 网格页面行数走实测 panelH 反推（`getMidPanelHeight()`），非估算公式
