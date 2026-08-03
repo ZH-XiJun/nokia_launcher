@@ -1,22 +1,25 @@
 pluginManagement {
     repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        // 国内镜像加速
         maven { url = "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/" }
         maven { url = "https://maven.aliyun.com/repository/public/" }
         mavenLocal()
-        gradlePluginPortal()
-        google()
-        mavenCentral()
     }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        google()
+        mavenCentral()
+        // JitPack（必须排在镜像前面，com.github.* 只有 jitpack.io 能构建）
+        maven { url "https://jitpack.io" }
+        // 国内镜像加速（不包含 JitPack 构建的 com.github.* 依赖）
         maven { url = "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/" }
         maven { url = "https://maven.aliyun.com/repository/public/" }
         mavenLocal()
-        google()
-        mavenCentral()
-        maven { url "https://jitpack.io" }
     }
 }
 rootProject.name = "J2ME Loader"
