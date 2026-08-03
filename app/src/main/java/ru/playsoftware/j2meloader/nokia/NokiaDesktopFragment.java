@@ -36,6 +36,7 @@ import java.util.Locale;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.config.Config;
+import ru.playsoftware.j2meloader.nokia.TopQuickToggleController;
 
 /**
  * 桌面待机屏中间内容碎片。
@@ -54,6 +55,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	/** 选中快捷应用图标上方浮出的名称气泡 */
 	private TextView shortcutNameBubble;
 	private HorizontalScrollView shortcutBar;
+	private HorizontalScrollView topScrollBar;
 	private Handler bubbleHandler;
 	private static final long BUBBLE_DURATION = 2000;
 
@@ -61,9 +63,13 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	private int shortcutCount = 0;
 	/** 组件区项数（动态，由 widgetItems.size() 决定） */
 	private int widgetCount = 0;
+	/** 顶部开关栏项数（固定 6 个开关） */
+	private int toggleCount = 0;
+	/** 顶部开关栏的开关 cell 列表（Activity 级 topScrollContainer 中） */
+	private final List<View> topToggleCells = new ArrayList<>();
 
-	/** 快捷栏第一个焦点索引 */
-	private static final int SHORTCUT_FIRST = 0;
+	/** 开关栏第一个焦点索引（开关栏在顶部，是 focusTargets 的最前部分） */
+	private static final int TOGGLE_FIRST = 0;
 
 	@Nullable
 	@Override
@@ -81,6 +87,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		// 快捷栏位于 Activity 级布局（中面板与底栏之间），从 Activity 获取引用
 		shortcutBar = requireActivity().findViewById(R.id.shortcutBar);
 		shortcutNameBubble = requireActivity().findViewById(R.id.shortcutNameBubble);
+		topScrollBar = requireActivity().findViewById(R.id.topScrollBar);
 		bubbleHandler = new Handler(Looper.getMainLooper());
 
 		// 点线分割线
@@ -108,11 +115,12 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		focusIndex = -1;
 		selectedView = null;
 
+		buildTopToggles();
 		loadShortcutBarAsync(view);
 		rebuildWidgetArea(view);
 
-		NokiaLog.i("Desktop", "桌面待机屏初始化完成：快捷栏 " + shortcutCount
-				+ " 项，组件区 " + widgetCount + " 项");
+		NokiaLog.i("Desktop", "桌面待机屏初始化完成：开关栏 " + toggleCount
+				+ " 项，快捷栏 " + shortcutCount + " 项，组件区 " + widgetCount + " 项");
 	}
 
 	@Override
@@ -125,7 +133,88 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		if (view != null) {
 			rebuildWidgetArea(view);
 		}
-		NokiaLog.d("Desktop", "桌面 onResume，已刷新组件区");
+		// 刷新开关状态（可能被系统设置页/权限授权改变）
+		refreshToggleStates();
+		NokiaLog.d("Desktop", "桌面 onResume，已刷新组件区与开关状态");
+	}
+
+	// ---- 顶部快捷开关栏 ----
+
+	/** 构建顶部开关栏：在 Activity 级 topScrollContainer 中创建 6 个开关 cell。 */
+	private void buildTopToggles() {
+		LinearLayout container = requireActivity().findViewById(R.id.topScrollContainer);
+		if (container == null) return;
+		container.removeAllViews();
+		topToggleCells.clear();
+
+		for (int i = 0; i < TopQuickToggleController.TOGGLE_COUNT; i++) {
+			final int index = i;
+			LinearLayout cell = new LinearLayout(requireContext());
+			cell.setLayoutParams(new LinearLayout.LayoutParams(
+					NokiaDimens.dp(getResources(), 30), NokiaDimens.dp(getResources(), 30)));
+			cell.setGravity(Gravity.CENTER);
+			cell.setClickable(true);
+
+			ImageView iv = new ImageView(requireContext());
+			iv.setLayoutParams(new LinearLayout.LayoutParams(
+					NokiaDimens.dp(getResources(), 20), NokiaDimens.dp(getResources(), 20)));
+			iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+			iv.setImageResource(TopQuickToggleController.getIcon(index));
+			cell.addView(iv);
+
+			// 亮/暗状态：开启亮（alpha 1.0），关闭暗（alpha 0.3）
+			refreshToggleState(cell, iv, index);
+
+			cell.setOnClickListener(v -> {
+				TopQuickToggleController controller = getToggleController();
+				if (controller != null && controller.toggle(index)) {
+					// 直接切换成功，稍后刷新状态
+					refreshToggleState(cell, iv, index);
+				}
+			});
+
+			container.addView(cell);
+			topToggleCells.add(cell);
+		}
+		toggleCount = topToggleCells.size();
+		NokiaLog.i("Desktop", "顶部开关栏构建完成：" + toggleCount + " 个开关");
+	}
+
+	/** 刷新单个开关 cell 的亮/暗状态。 */
+	private void refreshToggleState(LinearLayout cell, ImageView iv, int index) {
+		TopQuickToggleController controller = getToggleController();
+		boolean on = controller != null && controller.isEnabled(index);
+		float alpha = on ? 1f : 0.3f;
+		if (iv != null) iv.setAlpha(alpha);
+		if (cell != null) cell.setTag(on);
+		NokiaLog.d("Desktop", "开关[" + TopQuickToggleController.getName(index) + "] -> " + (on ? "开" : "关"));
+	}
+
+	/** 刷新所有开关 cell 的亮/暗状态（系统状态变化或权限授权后调用）。 */
+	public void refreshToggleStates() {
+		if (topToggleCells.isEmpty()) return;
+		TopQuickToggleController controller = getToggleController();
+		if (controller == null) return;
+		for (int i = 0; i < topToggleCells.size(); i++) {
+			LinearLayout cell = (LinearLayout) topToggleCells.get(i);
+			if (cell == null || cell.getChildCount() == 0) continue;
+			ImageView iv = (ImageView) cell.getChildAt(0);
+			refreshToggleState(cell, iv, i);
+		}
+	}
+
+	private TopQuickToggleController getToggleController() {
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		return host.getToggleController();
+	}
+
+	/** 把开关栏 cell 加入 focusTargets 最前（顶部）。 */
+	private void prependTopToggleTargets() {
+		for (View cell : topToggleCells) {
+			if (!focusTargets.contains(cell)) {
+				focusTargets.add(cell);
+			}
+		}
 	}
 
 	// ---- 构建快捷栏 ----
@@ -160,6 +249,8 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		selectedView = null;
 
 		focusTargets.clear();
+		// 开关栏项始终排在最前（顶部），然后是快捷栏项与组件项
+		prependTopToggleTargets();
 
 		if (apps.isEmpty()) {
 			TextView hint = new TextView(requireContext());
@@ -235,10 +326,10 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			NokiaLog.i("Desktop", "组件区已渲染 " + widgetItems.size() + " 个组件");
 		}
 
-		// 重建焦点列表（保留快捷栏部分，重建组件区部分）
+		// 重建焦点列表（保留开关栏 + 快捷栏部分，重建组件区部分）
 		// 先清掉旧的组件区焦点
-		int shortcutFocusCount = Math.min(focusTargets.size(), shortcutCount);
-		while (focusTargets.size() > shortcutFocusCount) {
+		int keepCount = Math.min(focusTargets.size(), toggleCount + shortcutCount);
+		while (focusTargets.size() > keepCount) {
 			focusTargets.remove(focusTargets.size() - 1);
 		}
 		// 重新收集
@@ -688,12 +779,16 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	private void collectWidgetTargets(View view) {
 		LinearLayout notifArea = view.findViewById(R.id.notificationArea);
 		if (notifArea == null) return;
+		int added = 0;
 		for (int i = 0; i < notifArea.getChildCount(); i++) {
 			View child = notifArea.getChildAt(i);
 			if (child.isFocusable()) {
 				focusTargets.add(child);
+				added++;
 			}
 		}
+		NokiaLog.i("Desktop", "collectWidgetTargets 收集 " + added + " 个组件（childCount="
+				+ notifArea.getChildCount() + "）");
 	}
 
 	// ---- NokiaFocusHost ----
@@ -752,55 +847,76 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 	// ---- 导航 ----
 
-	private int shortcutLast() { return shortcutCount; }
-	private int widgetFirst() { return shortcutCount; }
-	private int widgetLast() { return shortcutCount + widgetCount; }
+	private int toggleLast() { return toggleCount; }
+	private int shortcutFirst() { return toggleCount; }
+	private int shortcutLast() { return toggleCount + shortcutCount; }
+	private int widgetFirst() { return toggleCount + shortcutCount; }
+	private int widgetLast() { return toggleCount + shortcutCount + widgetCount; }
 
-	private boolean isInShortcuts() { return focusIndex >= SHORTCUT_FIRST && focusIndex < shortcutLast(); }
+	private boolean isInToggles() { return focusIndex >= TOGGLE_FIRST && focusIndex < toggleLast(); }
+	private boolean isInShortcuts() { return focusIndex >= shortcutFirst() && focusIndex < shortcutLast(); }
 	private boolean isInWidgets() { return focusIndex >= widgetFirst() && focusIndex < widgetLast(); }
 
 	private boolean moveUp() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
-			// 从快捷栏按"上"：跳到组件区底部（最靠近的位置），无组件区则不移动
+			// 快捷栏按"上"：跳组件区底部（最靠近），无组件区则不移动
 			if (widgetCount > 0) {
 				newIdx = widgetLast() - 1;
 			}
 		} else if (isInWidgets()) {
+			// 组件区按"上"：上一个组件；到顶部（第一个组件）则跳开关栏最后一项（开关栏在上方）
 			if (focusIndex > widgetFirst()) {
 				newIdx = focusIndex - 1;
 			} else {
-				if (shortcutCount > 0) newIdx = shortcutLast() - 1;
+				if (toggleCount > 0) newIdx = toggleLast() - 1;
 			}
+		} else if (isInToggles()) {
+			// 开关栏在顶部，按"上"不动
 		}
 		return applyFocus(newIdx);
 	}
 
 	private boolean moveDown() {
 		int newIdx = focusIndex;
-		if (isInShortcuts()) {
+		if (isInToggles()) {
+			// 开关栏按"下"：跳组件区第一项；无组件则跳快捷栏第一项
 			if (widgetCount > 0) {
 				newIdx = widgetFirst();
+			} else if (shortcutCount > 0) {
+				newIdx = shortcutFirst();
 			}
 		} else if (isInWidgets()) {
+			// 组件区按"下"：下一个组件；到底部则跳快捷栏第一项
 			if (focusIndex < widgetLast() - 1) {
 				newIdx = focusIndex + 1;
 			} else {
-				if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
+				if (shortcutCount > 0) newIdx = shortcutFirst();
 			}
+		} else if (isInShortcuts()) {
+			// 快捷栏在底部，按"下"不动
 		}
 		return applyFocus(newIdx);
 	}
 
 	private boolean moveLeft() {
 		int newIdx = focusIndex;
-		if (isInShortcuts()) {
-			if (focusIndex > SHORTCUT_FIRST) {
+		if (isInToggles()) {
+			// 开关栏横向左移，到最左循环到最右
+			if (focusIndex > TOGGLE_FIRST) {
+				newIdx = focusIndex - 1;
+			} else if (toggleCount > 1) {
+				newIdx = toggleLast() - 1;
+			}
+		} else if (isInShortcuts()) {
+			// 快捷栏横向左移，循环
+			if (focusIndex > shortcutFirst()) {
 				newIdx = focusIndex - 1;
 			} else if (shortcutCount > 1) {
 				newIdx = shortcutLast() - 1;
 			}
 		} else if (isInWidgets()) {
+			// 组件区按"左"：跳快捷栏最后一项
 			if (shortcutCount > 0) newIdx = shortcutLast() - 1;
 		}
 		return applyFocus(newIdx);
@@ -808,19 +924,30 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 	private boolean moveRight() {
 		int newIdx = focusIndex;
-		if (isInShortcuts()) {
+		if (isInToggles()) {
+			// 开关栏横向右移，循环
+			if (focusIndex < toggleLast() - 1) {
+				newIdx = focusIndex + 1;
+			} else if (toggleCount > 1) {
+				newIdx = TOGGLE_FIRST;
+			}
+		} else if (isInShortcuts()) {
+			// 快捷栏横向右移，循环
 			if (focusIndex < shortcutLast() - 1) {
 				newIdx = focusIndex + 1;
 			} else if (shortcutCount > 1) {
-				newIdx = SHORTCUT_FIRST;
+				newIdx = shortcutFirst();
 			}
 		} else if (isInWidgets()) {
-			if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
+			// 组件区按"右"：跳快捷栏第一项
+			if (shortcutCount > 0) newIdx = shortcutFirst();
 		}
 		return applyFocus(newIdx);
 	}
 
 	private boolean applyFocus(int newIdx) {
+		NokiaLog.i("Desktop", "applyFocus newIdx=" + newIdx + " cur=" + focusIndex
+				+ " size=" + focusTargets.size());
 		if (newIdx < 0 || newIdx >= focusTargets.size()) return false;
 		if (newIdx != focusIndex) {
 			scrollToVisible(newIdx);
@@ -831,7 +958,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	}
 
 	private void scrollToVisible(int index) {
-		if (!isInShortcuts()) return;
+		if (!isInShortcuts() && !isInToggles()) return;
 		if (index < 0 || index >= focusTargets.size()) return;
 		View target = focusTargets.get(index);
 		if (target == null) return;
@@ -839,7 +966,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		ViewParent parent = target.getParent();
 		while (parent instanceof View) {
 			View pv = (View) parent;
-			if (pv.getId() == R.id.shortcutBar) {
+			if (pv.getId() == R.id.shortcutBar || pv.getId() == R.id.topScrollBar) {
 				int scrollX = target.getLeft() - pv.getPaddingLeft();
 				pv.scrollTo(Math.max(0, scrollX - NokiaDimens.dp(getResources(), 12)), 0);
 				return;
@@ -869,8 +996,10 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 	private void showShortcutBubble(int index, View cell) {
 		if (shortcutNameBubble == null || shortcutBar == null) return;
-		if (index < 0 || index >= shortcutApps.size()) return;
-		ShortcutApp app = shortcutApps.get(index);
+		// 快捷栏项在 focusTargets 中从 shortcutFirst() 起，需减去偏移取 shortcutApps
+		int appIndex = index - shortcutFirst();
+		if (appIndex < 0 || appIndex >= shortcutApps.size()) return;
+		ShortcutApp app = shortcutApps.get(appIndex);
 		shortcutNameBubble.setText(app.label);
 
 		// 气泡是 Activity 根 FrameLayout 覆盖层，坐标用窗口绝对坐标计算

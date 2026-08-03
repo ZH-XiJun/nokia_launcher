@@ -13,6 +13,7 @@ import androidx.fragment.app.FragmentManager;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
+import ru.playsoftware.j2meloader.nokia.NokiaDashedLineDrawable;
 import ru.playsoftware.j2meloader.nokia.NokiaDimens;
 import ru.playsoftware.j2meloader.nokia.NokiaLog;
 
@@ -29,6 +30,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	private static final String ACTION_HOME = Intent.ACTION_MAIN;
 	private static final String CATEGORY_HOME = Intent.CATEGORY_HOME;
 	private StatusBarController statusBarController;
+	private TopQuickToggleController toggleController;
 	private NokiaKeyBinding keyBinding;
 	/** Activity 是否处于 resumed 状态（延迟任务防重入校验用） */
 	private boolean resumedFlag = false;
@@ -48,12 +50,15 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		setupNokiaUi();
 		// 对底部快捷栏内层内容做整体缩放（与底栏一致，沿用 240 基准 + setScaleX/Y 架构）
 		scaleShortcutBar();
+		// 对桌面顶部横向滚动栏内层内容做整体缩放（同快捷栏架构）
+		scaleTopScrollBar();
 		findViewById(R.id.midPanel).setVisibility(View.VISIBLE);
 
 		// 底部软键触摸点击：等效于对应物理软键（修复「桌面设置」等页触摸返回无效）
 		bindBottomBarTouch();
 
 		statusBarController = new StatusBarController(this);
+		toggleController = new TopQuickToggleController(this);
 		keyBinding = new NokiaKeyBinding(this);
 
 		// 确保全局 JAR 设置 profile 存在并设为默认
@@ -113,8 +118,10 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		// 快捷应用栏仅桌面待机屏显示（位于中面板与底栏之间），其他页面隐藏。
 		if (f instanceof NokiaDesktopFragment) {
 			showShortcutBar();
+			showTopScrollBar();
 		} else {
 			hideShortcutBar();
+			hideTopScrollBar();
 		}
 	}
 
@@ -193,6 +200,14 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 				&& grantResults.length > 0
 				&& grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 			statusBarController.onPermissionGranted();
+		}
+		if (toggleController != null) {
+			toggleController.onRequestPermissionsResult(requestCode, grantResults);
+			// 授权后开关状态可能变化，刷新当前桌面 Fragment 的开关栏
+			Fragment current = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+			if (current instanceof NokiaDesktopFragment) {
+				((NokiaDesktopFragment) current).refreshToggleStates();
+			}
 		}
 	}
 
@@ -358,6 +373,62 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 			panel.setVisibility(View.GONE);
 			NokiaLog.d("Desktop", "hideShortcutBar 隐藏快捷栏");
 		}
+	}
+
+	// ---- 桌面顶部横向滚动栏（位于信号栏下方、桌面组件上方，仅桌面待机屏显示） ----
+
+	/** 对顶部滚动栏内层 240dp 内容做等比缩放（同快捷栏架构），并设置点线背景与外层高度。 */
+	private void scaleTopScrollBar() {
+		View panel = findViewById(R.id.topScrollBarPanel);
+		if (panel == null) return;
+		float scale = getScale();
+		if (panel instanceof ViewGroup && ((ViewGroup) panel).getChildCount() > 0) {
+			View content = ((ViewGroup) panel).getChildAt(0);
+			content.setPivotX(0);
+			content.setPivotY(0);
+			if (Math.abs(scale - 1f) >= 0.001f) {
+				content.setScaleX(scale);
+				content.setScaleY(scale);
+			}
+			// 显式设置外层高度，避免 setScaleY 视觉变换后内容被截断。
+			// 设计高度 = 上下点线 1+1 + 内边距 6+6 + 滚动区最小高度 36 = 50dp。
+			ViewGroup.LayoutParams lp = panel.getLayoutParams();
+			lp.height = Math.round(NokiaDimens.dpF(getResources(), 50) * scale);
+			panel.setLayoutParams(lp);
+		}
+		// 上下点线用 NokiaDashedLineDrawable 点阵（禁止 XML shape dash / DashPathEffect）
+		View dividerTop = findViewById(R.id.topScrollDividerTop);
+		View dividerBottom = findViewById(R.id.topScrollDivider);
+		if (dividerTop != null) {
+			dividerTop.setBackground(new NokiaDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
+		}
+		if (dividerBottom != null) {
+			dividerBottom.setBackground(new NokiaDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
+		}
+		NokiaLog.d("Desktop", "scaleTopScrollBar 完成 scale=" + scale);
+	}
+
+	/** 显示顶部横向滚动栏（仅桌面待机屏调用）。 */
+	public void showTopScrollBar() {
+		View panel = findViewById(R.id.topScrollBarPanel);
+		if (panel != null) {
+			panel.setVisibility(View.VISIBLE);
+			NokiaLog.d("Desktop", "showTopScrollBar 显示顶部滚动栏");
+		}
+	}
+
+	/** 隐藏顶部横向滚动栏（进入功能表/百宝箱/设置等页面时调用）。 */
+	public void hideTopScrollBar() {
+		View panel = findViewById(R.id.topScrollBarPanel);
+		if (panel != null) {
+			panel.setVisibility(View.GONE);
+			NokiaLog.d("Desktop", "hideTopScrollBar 隐藏顶部滚动栏");
+		}
+	}
+
+	/** 获取顶部快捷开关控制器（供桌面 Fragment 构建/刷新开关栏）。 */
+	public TopQuickToggleController getToggleController() {
+		return toggleController;
 	}
 
 	/**

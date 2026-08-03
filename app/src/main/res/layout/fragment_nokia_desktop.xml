@@ -22,13 +22,58 @@
         android:paddingBottom="4dp" />
 
 
+    <!-- 桌面环形装饰：大小不一分布在各处，透明度低，不遮挡交互。
+         均避开底部快捷栏区域（底部装饰留出足够 marginBottom），保证完整显示。 -->
     <ImageView
-        android:layout_width="80dp"
-        android:layout_height="80dp"
+        android:id="@+id/decoRingLargeTopRight"
+        android:layout_width="90dp"
+        android:layout_height="90dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="14dp"
+        android:alpha="0.12"
+        app:srcCompat="@drawable/deco_rings" />
+
+    <ImageView
+        android:id="@+id/decoRingMidTopLeft"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true"
+        android:layout_marginTop="44dp"
+        android:layout_marginStart="12dp"
+        android:alpha="0.10"
+        app:srcCompat="@drawable/deco_rings" />
+
+    <ImageView
+        android:id="@+id/decoRingMidRight"
+        android:layout_width="70dp"
+        android:layout_height="70dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="6dp"
+        android:alpha="0.10"
+        app:srcCompat="@drawable/deco_rings" />
+
+    <ImageView
+        android:id="@+id/decoRingSmallLeft"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="6dp"
+        android:alpha="0.10"
+        app:srcCompat="@drawable/deco_rings" />
+
+    <ImageView
+        android:id="@+id/decoRingBottom"
+        android:layout_width="70dp"
+        android:layout_height="70dp"
         android:layout_alignParentBottom="true"
         android:layout_alignParentEnd="true"
-        android:layout_marginBottom="6dp"
+        android:layout_marginBottom="48dp"
         android:layout_marginEnd="10dp"
-        android:alpha="0.15"
+        android:alpha="0.12"
         app:srcCompat="@drawable/deco_rings" />
 </RelativeLayout>

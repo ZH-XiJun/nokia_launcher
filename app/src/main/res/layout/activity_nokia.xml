@@ -17,6 +17,59 @@
 
         <include layout="@layout/nokia_top_bar" />
 
+        <!-- 桌面顶部横向滚动栏：位于信号栏下方、桌面组件上方，仅桌面待机屏显示（默认隐藏）。
+             背景透明以融入桌面壁纸；上下点线分隔；内部横向可滚动，内容后续填充。
+             外层 match_parent + 内层 240dp 内容由 Activity 按整体缩放架构 setScaleX/Y。 -->
+        <LinearLayout
+            android:id="@+id/topScrollBarPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="240dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- 上方点线分割线（代码覆盖背景为 NokiaDashedLineDrawable 点阵） -->
+                <View
+                    android:id="@+id/topScrollDividerTop"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp" />
+
+                <!-- 横向滚动区：无内容时也要有可见高度，避免上下两条点线黏在一起 -->
+                <HorizontalScrollView
+                    android:id="@+id/topScrollBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="36dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/topScrollContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="4dp"
+                        android:paddingTop="6dp"
+                        android:paddingEnd="4dp"
+                        android:paddingBottom="6dp" />
+                </HorizontalScrollView>
+
+                <!-- 下方点线分割线（代码覆盖背景为 NokiaDashedLineDrawable 点阵） -->
+                <View
+                    android:id="@+id/topScrollDivider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp" />
+            </LinearLayout>
+        </LinearLayout>
+
         <FrameLayout
             android:id="@+id/midPanel"
             android:layout_width="match_parent"
@@ -26,12 +79,12 @@
 
         <!-- 桌面快捷应用栏：位于中面板与底部软键栏之间，仅桌面待机屏显示（默认隐藏）。
              外层 match_parent 铺满，内层 240dp 内容由基类按整体缩放架构 setScaleX/Y。
-             结构同 nokia_bottom_bar：点线 + 横向滚动快捷栏 + 点线 + 浮于栏上方的名称气泡。 -->
+             背景透明以融入桌面壁纸；结构同 nokia_bottom_bar：点线 + 横向滚动快捷栏 + 点线 + 浮于栏上方的名称气泡。 -->
         <LinearLayout
             android:id="@+id/shortcutBarPanel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_nokia_softkey"
+            android:background="@android:color/transparent"
             android:visibility="gone">
 
             <LinearLayout
