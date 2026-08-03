@@ -109,9 +109,17 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 		});
 
 		// 加载已选中的应用（以已保存列表为基准，避免构建列表不完整时丢失）
+		// 安卓应用统一以"包名"作为 key（而非 pkg/className），因为默认快捷栏生成
+		// 短信/拨号等 action_ 应用时解析出的 Activity，与设置页 queryIntentActivities
+		// 遍历出的 LAUNCHER Activity 常常不一致（如短信：默认 LaunchConversationActivity，
+		// 列表 ConversationListActivity）。若用完整 className 作 key，取消勾选会误判"未选中"
+		// 反而把应用重新加回，表现为"设置页显示未勾选但桌面仍展示"。统一包名即可消歧。
 		List<ShortcutApp> current = settingsStorage.getShortcutApps();
 		for (ShortcutApp app : current) {
-			selectedMap.put(makeKey(app.type, app.appKey), app);
+			String key = app.type == ShortcutApp.TYPE_ANDROID
+					? makeKey(ShortcutApp.TYPE_ANDROID, pkgOfAppKey(app.appKey))
+					: makeKey(app.type, app.appKey);
+			selectedMap.put(key, app);
 		}
 		NokiaLog.i("ShortcutSettings", "已加载 " + selectedMap.size() + " 个已选应用");
 
@@ -359,15 +367,27 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 				String[] parts = cls.split(":", 3);
 				return ShortcutApp.TYPE_J2ME + ":" + (parts.length > 2 ? parts[2] : cls);
 			}
-			return ShortcutApp.TYPE_ANDROID + ":"
-					+ app.launchIntent.getComponent().getPackageName() + "/"
-					+ app.launchIntent.getComponent().getClassName();
-		}
+		// 安卓应用只用"包名"作为 key，忽略 Activity className。
+		// 默认快捷栏生成短信/拨号等 action_ 应用时解析出的 Activity，
+		// 与设置页 queryIntentActivities 遍历出的 LAUNCHER Activity 常常不一致
+		// （如短信：默认 LaunchConversationActivity，列表 ConversationListActivity）。
+		// 若用完整 className 作 key，取消勾选会误判"未选中"反而把应用重新加回，
+		// 表现为"设置页显示未勾选但桌面仍展示"。统一包名即可消歧。
+		return ShortcutApp.TYPE_ANDROID + ":"
+				+ app.launchIntent.getComponent().getPackageName();
+	}
 		return "unknown:" + app.label;
 	}
 
 	private static String makeKey(int type, String appKey) {
 		return type + ":" + appKey;
+	}
+
+	/** 从已保存的 appKey(pkg/className) 中取包名，用于与设置页列表按包名匹配 */
+	private static String pkgOfAppKey(String appKey) {
+		if (appKey == null) return "";
+		int slash = appKey.indexOf('/');
+		return slash > 0 ? appKey.substring(0, slash) : appKey;
 	}
 
 	private void toggleSelection(int index) {
