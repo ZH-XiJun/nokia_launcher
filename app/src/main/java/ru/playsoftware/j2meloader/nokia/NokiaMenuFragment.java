@@ -230,8 +230,8 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 			launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 			NokiaAppItem item = new NokiaAppItem(NokiaAppItem.TYPE_APP, label, icon, launch);
 
-			// 尝试替换为 S60 风格图标，同时记录匹配结果用于后续分组排序
-			int s60IconRes = NokiaS60IconMap.getIcon(ai.packageName);
+			// 尝试替换为 S60 风格图标，同时记录匹配结果用于后续分组排序（传入 label 以启用应用名匹配）
+			int s60IconRes = NokiaS60IconMap.getIcon(ai.packageName, label);
 			item.s60IconResId = s60IconRes;
 			if (s60IconRes != 0) {
 				Drawable s60Icon = safeDrawable(host, s60IconRes);
@@ -337,7 +337,7 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 			if (item.type != NokiaAppItem.TYPE_APP) continue;
 			if (item.launchIntent == null || item.launchIntent.getComponent() == null) continue;
 			String pkg = item.launchIntent.getComponent().getPackageName();
-			int resId = NokiaS60IconMap.getIcon(pkg);
+			int resId = NokiaS60IconMap.getIcon(pkg, item.label);
 			if (resId == 0) continue;
 			Drawable s60Icon = safeDrawable((NokiaDesktopActivity) requireActivity(), resId);
 			if (s60Icon == null) continue;

@@ -635,8 +635,8 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 		}
 
 		String pkg = cn.getPackageName();
-		// 第 1 优先级：S60 风格图标（读内存缓存，毫秒级，主线程安全）
-		int s60Res = NokiaS60IconMap.getIcon(pkg);
+		// 第 1 优先级：S60 风格图标（读内存缓存，毫秒级，主线程安全；传入 label 以启用应用名匹配）
+		int s60Res = NokiaS60IconMap.getIcon(pkg, item.label);
 		if (s60Res != 0) {
 			try {
 				Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);

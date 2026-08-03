@@ -266,11 +266,23 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 			row.setClickable(true);
 
 
-			// 图标
+			// 图标：优先 S60 风格图标（安卓应用，命中时替换；J2ME 占位 component 不参与）
+			Drawable listIcon = app.icon;
+			if (app.launchIntent != null && app.launchIntent.getComponent() != null
+					&& !key.startsWith(ShortcutApp.TYPE_J2ME + ":")) {
+				String pkg = app.launchIntent.getComponent().getPackageName();
+				int s60Res = NokiaS60IconMap.getIcon(pkg, app.label);
+				if (s60Res != 0) {
+					try {
+						Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
+						if (s60Icon != null) listIcon = s60Icon;
+					} catch (Exception ignored) {}
+				}
+			}
 			ImageView iv = new ImageView(requireContext());
 			iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 24), NokiaDimens.dp(getResources(), 24)));
-			if (app.icon != null) {
-				iv.setImageDrawable(app.icon);
+			if (listIcon != null) {
+				iv.setImageDrawable(listIcon);
 			} else {
 				try {
 					iv.setImageDrawable(ContextCompat.getDrawable(requireContext(), R.mipmap.ic_launcher));

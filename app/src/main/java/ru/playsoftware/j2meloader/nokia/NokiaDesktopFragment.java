@@ -598,22 +598,22 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 	private Drawable loadShortcutIconMemory(ShortcutApp app) {
 		try {
-			if (app.type == ShortcutApp.TYPE_ANDROID) {
-				Intent intent = app.getLaunchIntent();
-				if (intent != null && intent.getComponent() != null) {
-					String pkg = intent.getComponent().getPackageName();
-					int s60Res = NokiaS60IconMap.getIcon(pkg);
-					if (s60Res != 0) {
-						try {
-							Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
-							if (s60Icon != null) return s60Icon.mutate();
-						} catch (Exception ignored) {}
-					}
+		if (app.type == ShortcutApp.TYPE_ANDROID) {
+			Intent intent = app.getLaunchIntent();
+			if (intent != null && intent.getComponent() != null) {
+				String pkg = intent.getComponent().getPackageName();
+				int s60Res = NokiaS60IconMap.getIcon(pkg, app.label);
+				if (s60Res != 0) {
+					try {
+						Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
+						if (s60Icon != null) return s60Icon.mutate();
+					} catch (Exception ignored) {}
 				}
 			}
-		} catch (Exception e) {
-			NokiaLog.w("Desktop", "加载快捷栏图标(内存)失败: " + app.label);
 		}
+	} catch (Exception e) {
+		NokiaLog.w("Desktop", "加载快捷栏图标(内存)失败: " + app.label);
+	}
 		return null;
 	}
 
@@ -627,7 +627,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 				Intent intent = app.getLaunchIntent();
 				if (intent != null && intent.getComponent() != null) {
 					String pkg = intent.getComponent().getPackageName();
-					int s60Res = NokiaS60IconMap.getIcon(pkg);
+					int s60Res = NokiaS60IconMap.getIcon(pkg, app.label);
 					if (s60Res != 0) {
 						try {
 							Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
