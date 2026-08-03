@@ -35,6 +35,9 @@ captures/
 # Keystore files
 *.jks
 
+# 本地签名配置（含 test.jks 路径/密码），不进入版本库。各开发者本地维护自己的 keystore.properties
+keystore.properties
+
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild
 .cxx
